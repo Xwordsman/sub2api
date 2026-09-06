@@ -107,7 +107,12 @@ func (i *PluginPackageInstaller) Install(ctx context.Context, reader io.Reader, 
 	if err != nil {
 		return nil, fmt.Errorf("插件包不是有效的 ZIP: %w", err)
 	}
-	defer func() { _ = archive.Close() }()
+	archiveClosed := false
+	defer func() {
+		if !archiveClosed {
+			_ = archive.Close()
+		}
+	}()
 	manifest, _, signatureStatus, err := i.inspectArchive(&archive.Reader)
 	if err != nil {
 		return nil, err
@@ -141,6 +146,14 @@ func (i *PluginPackageInstaller) Install(ctx context.Context, reader io.Reader, 
 		return nil, fmt.Errorf("提交插件安装目录: %w", err)
 	}
 	extracted = true
+	// Windows keeps the ZIP file handle open until the archive is closed. Close
+	// it before renaming the staging artifact into packages/, otherwise a valid
+	// upload fails with ERROR_SHARING_VIOLATION on Windows hosts.
+	if err := archive.Close(); err != nil {
+		_ = os.RemoveAll(installPath)
+		return nil, fmt.Errorf("关闭插件包: %w", err)
+	}
+	archiveClosed = true
 
 	artifactPath := filepath.Join(packagesDir, manifest.ID+"-"+manifest.Version+"-"+artifactSHA[:12]+"-"+installNonce+".s2plugin")
 	if err := os.Rename(tempPath, artifactPath); err != nil {
@@ -154,7 +167,12 @@ func (i *PluginPackageInstaller) Install(ctx context.Context, reader io.Reader, 
 		_ = os.RemoveAll(installPath)
 		return nil, fmt.Errorf("读取已保存插件包: %w", err)
 	}
-	runtimeEntry := manifest.Runtimes[manifest.RuntimeKey()]
+	var binaryPath, binarySHA256 string
+	if manifest.RequiresRuntime() {
+		runtimeEntry := manifest.Runtimes[manifest.RuntimeKey()]
+		binaryPath = filepath.Join(installPath, filepath.FromSlash(runtimeEntry.Path))
+		binarySHA256 = manifest.Files[runtimeEntry.Path]
+	}
 	return &PluginInstallation{
 		PluginKey:       manifest.ID,
 		Name:            manifest.Name,
@@ -165,8 +183,8 @@ func (i *PluginPackageInstaller) Install(ctx context.Context, reader io.Reader, 
 		ArtifactData:    artifactData,
 		ArtifactPath:    artifactPath,
 		InstallPath:     installPath,
-		BinaryPath:      filepath.Join(installPath, filepath.FromSlash(runtimeEntry.Path)),
-		BinarySHA256:    manifest.Files[runtimeEntry.Path],
+		BinaryPath:      binaryPath,
+		BinarySHA256:    binarySHA256,
 		SignatureStatus: signatureStatus,
 		State:           initialState,
 		InstalledBy:     installedBy,
@@ -320,7 +338,7 @@ func (i *PluginPackageInstaller) extractArchive(ctx context.Context, archive *zi
 		}
 		hasher := sha256.New()
 		mode := os.FileMode(0o600)
-		if path == manifest.Runtimes[manifest.RuntimeKey()].Path {
+		if manifest.RequiresRuntime() && path == manifest.Runtimes[manifest.RuntimeKey()].Path {
 			mode = 0o700
 		}
 		output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)

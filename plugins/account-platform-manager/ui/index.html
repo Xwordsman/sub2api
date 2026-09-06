@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>账号平台原地切换扩展</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --warning-bg: #fffbeb;
+      --warning-border: #fef3c7;
+      --warning-text: #92400e;
+      --danger: #ef4444;
+      --success-bg: #f0fdf4;
+      --success-border: #bbf7d0;
+      --success-text: #166534;
+      --input-bg: #ffffff;
+      --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #0f172a;
+        --card-bg: #1e293b;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+        --primary: #6366f1;
+        --primary-hover: #4f46e5;
+        --warning-bg: #451a03;
+        --warning-border: #78350f;
+        --warning-text: #fde68a;
+        --danger: #f87171;
+        --success-bg: #052e16;
+        --success-border: #166534;
+        --success-text: #86efac;
+        --input-bg: #0f172a;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease-in-out;
+    }
+    .btn-primary { background-color: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background-color: var(--primary-hover); }
+    .btn-secondary {
+      background-color: transparent;
+      border-color: var(--border-color);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover:not(:disabled) { background-color: rgba(148, 163, 184, 0.1); }
+    .btn-warning { background-color: #d97706; color: #fff; }
+    .btn-warning:hover:not(:disabled) { background-color: #b45309; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      background-color: var(--input-bg);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus { border-color: var(--primary); }
+    textarea.form-control { resize: vertical; min-height: 80px; font-family: monospace; }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+      padding: 12px;
+      background-color: rgba(148, 163, 184, 0.08);
+      border-radius: var(--radius);
+    }
+    .info-item span:first-child { color: var(--text-muted); display: block; font-size: 12px; }
+    .info-item span:last-child { font-weight: 500; }
+    .banner {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .banner-warning {
+      background-color: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
+    }
+    .banner-success {
+      background-color: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+    .banner-error {
+      background-color: #fef2f2;
+      border: 1px solid #fee2e2;
+      color: #991b1b;
+    }
+    .help-text { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      background-color: rgba(99, 102, 241, 0.15);
+      color: var(--primary);
+    }
+    .row { display: flex; gap: 12px; }
+    .col { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>账号平台原地切换</h1>
+        <p class="help-text">在保留账号 ID、名称及调度配置的前提下，原地切换上游厂商与凭据</p>
+      </div>
+      <button id="btn-refresh" class="btn btn-secondary">刷新账号列表</button>
+    </div>
+
+    <div id="notice-area"></div>
+
+    <div class="card">
+      <div class="card-title">第一步：选择需要调整的账号</div>
+      <div class="form-group">
+        <label for="select-account">目标账号</label>
+        <select id="select-account" class="form-control">
+          <option value="">-- 请选择账号 --</option>
+        </select>
+      </div>
+      <div id="account-detail" style="display: none;">
+        <div class="info-grid">
+          <div class="info-item"><span>账号 ID</span><span id="detail-id">-</span></div>
+          <div class="info-item"><span>名称</span><span id="detail-name">-</span></div>
+          <div class="info-item"><span>当前厂商 / 平台</span><span id="detail-platform" class="badge">-</span></div>
+          <div class="info-item"><span>当前接入类型</span><span id="detail-type">-</span></div>
+          <div class="info-item"><span>状态</span><span id="detail-status">-</span></div>
+          <div class="info-item"><span>已绑分组 ID</span><span id="detail-groups">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="form-card" style="display: none;">
+      <div class="card-title">第二步：配置新平台与凭据</div>
+      <div class="banner banner-warning">
+        <strong>注意事项：</strong> 原地切换会立即清除旧平台的凭据机密与临时探测/冷却运行态，请务必提供新平台有效凭据。通用调度配置（代理、并发、优先级、备注等）将原地保留。
+      </div>
+
+      <div class="row">
+        <div class="col form-group">
+          <label for="input-platform">目标平台 / 厂商</label>
+          <select id="input-platform" class="form-control">
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="antigravity">Antigravity</option>
+            <option value="grok">Grok</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="kimi">Moonshot Kimi</option>
+            <option value="zhipu">Zhipu AI (智谱)</option>
+          </select>
+        </div>
+        <div class="col form-group">
+          <label for="input-type">账号接入类型</label>
+          <select id="input-type" class="form-control">
+            <option value="apikey">apikey (API Key 直连)</option>
+            <option value="oauth">oauth (OAuth 鉴权)</option>
+            <option value="setup-token">setup-token (设置令牌)</option>
+            <option value="upstream">upstream (反向代理 / 上游聚合)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="input-groups">重新绑定分组 ID 列表</label>
+        <input type="text" id="input-groups" class="form-control" placeholder="例如: 1, 2 (留空则清空该账号的分组绑定)">
+        <p class="help-text">请填写整数分组 ID，逗号隔开；留空表示不加入任何分组。</p>
+      </div>
+
+      <div class="form-group" id="group-apikey">
+        <label for="input-apikey">新 API Key</label>
+        <input type="password" id="input-apikey" class="form-control" placeholder="sk-..." autocomplete="off">
+        <p class="help-text">新厂商的访问密钥，切换后将替换原凭据。</p>
+      </div>
+
+      <div class="form-group">
+        <label for="input-credentials-raw">高级凭据 JSON（可选，填写后将覆盖上述单一 API Key）</label>
+        <textarea id="input-credentials-raw" class="form-control" placeholder='{"api_key": "sk-..."}'></textarea>
+        <p class="help-text">若需填入 access_token、refresh_token、base_url 等复杂字段，请直接输入 JSON 对象。</p>
+      </div>
+
+      <div id="risk-warning-box" style="display: none;" class="banner banner-warning">
+        <p><strong>检测到混合渠道告警：</strong><span id="risk-warning-msg"></span></p>
+        <div style="margin-top: 8px;">
+          <button id="btn-force-submit" class="btn btn-warning">我已知晓风险，强制确认切换</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="btn-submit" class="btn btn-primary">确认原地切换平台</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      let accountsList = [];
+      let currentAccount = null;
+      let pendingRequests = new Map();
+
+      function notifyHostReady() {
+        window.parent.postMessage({ type: 'sub2api.plugin.ready' }, '*');
+        reportResize();
+      }
+
+      function reportResize() {
+        const height = Math.max(560, document.documentElement.scrollHeight + 30);
+        window.parent.postMessage({ type: 'ui.resize', height: height }, '*');
+      }
+
+      window.addEventListener('message', function (event) {
+        if (!event.data || typeof event.data !== 'object') return;
+        const msg = event.data;
+        if (msg.source !== 'sub2api-plugin-host') return;
+
+        if (msg.request_id && pendingRequests.has(msg.request_id)) {
+          const deferred = pendingRequests.get(msg.request_id);
+          pendingRequests.delete(msg.request_id);
+          if (msg.ok) {
+            deferred.resolve(msg);
+          } else {
+            deferred.reject(msg);
+          }
+        }
+      });
+
+      function callBridge(type, params) {
+        return new Promise(function (resolve, reject) {
+          const requestId = 'req_' + Math.random().toString(36).substring(2) + '_' + Date.now();
+          const timer = setTimeout(function () {
+            if (pendingRequests.has(requestId)) {
+              pendingRequests.delete(requestId);
+              reject({ error: 'Bridge request timeout', code: 'TIMEOUT' });
+            }
+          }, 30000);
+
+          pendingRequests.set(requestId, {
+            resolve: function (val) { clearTimeout(timer); resolve(val); },
+            reject: function (err) { clearTimeout(timer); reject(err); }
+          });
+
+          const msg = Object.assign({ type: type, request_id: requestId }, params || {});
+          window.parent.postMessage(msg, '*');
+        });
+      }
+
+      function showNotice(text, type) {
+        const area = document.getElementById('notice-area');
+        area.innerHTML = '<div class="banner banner-' + (type || 'success') + '">' + escapeHtml(text) + '</div>';
+        reportResize();
+      }
+
+      function clearNotice() {
+        document.getElementById('notice-area').innerHTML = '';
+        reportResize();
+      }
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/[&<>'"]/g, function (tag) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[tag] || tag;
+        });
+      }
+
+      function loadAccounts() {
+        clearNotice();
+        const select = document.getElementById('select-account');
+        select.innerHTML = '<option value="">正在加载账号列表...</option>';
+        document.getElementById('btn-refresh').disabled = true;
+
+        callBridge('account.list', { page: 1, page_size: 100 })
+          .then(function (res) {
+            document.getElementById('btn-refresh').disabled = false;
+            accountsList = (res.data && res.data.items) || [];
+            select.innerHTML = '<option value="">-- 请选择账号 (' + accountsList.length + ') --</option>';
+            accountsList.forEach(function (acc) {
+              const opt = document.createElement('option');
+              opt.value = acc.id;
+              opt.textContent = '#' + acc.id + ' - ' + acc.name + ' [' + acc.platform + ' / ' + acc.type + ']';
+              select.appendChild(opt);
+            });
+            if (currentAccount) {
+              select.value = currentAccount.id;
+              onSelectAccount(currentAccount.id);
+            }
+          })
+          .catch(function (err) {
+            document.getElementById('btn-refresh').disabled = false;
+            select.innerHTML = '<option value="">加载失败，点击刷新重试</option>';
+            showNotice('加载账号失败: ' + (err.error || err.message || '未知错误'), 'error');
+          });
+      }
+
+      function onSelectAccount(id) {
+        clearNotice();
+        document.getElementById('risk-warning-box').style.display = 'none';
+        if (!id) {
+          currentAccount = null;
+          document.getElementById('account-detail').style.display = 'none';
+          document.getElementById('form-card').style.display = 'none';
+          reportResize();
+          return;
+        }
+        const acc = accountsList.find(function (a) { return String(a.id) === String(id); });
+        if (!acc) return;
+        currentAccount = acc;
+
+        document.getElementById('detail-id').textContent = acc.id;
+        document.getElementById('detail-name').textContent = acc.name;
+        document.getElementById('detail-platform').textContent = acc.platform;
+        document.getElementById('detail-type').textContent = acc.type;
+        document.getElementById('detail-status').textContent = acc.status;
+        const groups = (acc.group_ids || []).join(', ') || '(无)';
+        document.getElementById('detail-groups').textContent = groups;
+        document.getElementById('account-detail').style.display = 'block';
+
+        // 默认表单继承当前分组
+        document.getElementById('input-groups').value = (acc.group_ids || []).join(', ');
+        document.getElementById('form-card').style.display = 'block';
+        reportResize();
+      }
+
+      function submitPlatformChange(confirmRisk) {
+        if (!currentAccount) return;
+        clearNotice();
+        const platform = document.getElementById('input-platform').value.trim();
+        const type = document.getElementById('input-type').value.trim();
+        const groupsRaw = document.getElementById('input-groups').value.trim();
+        const groupIds = groupsRaw ? groupsRaw.split(/[,，s]+/).filter(Boolean).map(function (n) { return parseInt(n, 10); }) : [];
+
+        let credentials = {};
+        const rawJson = document.getElementById('input-credentials-raw').value.trim();
+        if (rawJson) {
+          try {
+            credentials = JSON.parse(rawJson);
+          } catch (e) {
+            showNotice('高级凭据 JSON 格式错误: ' + e.message, 'error');
+            return;
+          }
+        } else {
+          const key = document.getElementById('input-apikey').value.trim();
+          if (!key && type === 'apikey') {
+            showNotice('请输入新平台 API Key 或高级凭据 JSON', 'error');
+            return;
+          }
+          if (key) {
+            credentials = { api_key: key };
+          }
+        }
+
+        const payload = {
+          id: currentAccount.id,
+          platform: platform,
+          type: type,
+          credentials: credentials,
+          group_ids: groupIds,
+          confirm_mixed_channel_risk: !!confirmRisk
+        };
+
+        const submitBtn = document.getElementById('btn-submit');
+        const forceBtn = document.getElementById('btn-force-submit');
+        submitBtn.disabled = true;
+        forceBtn.disabled = true;
+
+        callBridge('account.platform.update', { payload: payload })
+          .then(function (res) {
+            submitBtn.disabled = false;
+            forceBtn.disabled = false;
+            document.getElementById('risk-warning-box').style.display = 'none';
+            document.getElementById('input-apikey').value = '';
+            document.getElementById('input-credentials-raw').value = '';
+            showNotice('账号 #' + currentAccount.id + ' 平台已成功原地切换为 [' + platform + ']！', 'success');
+            loadAccounts();
+          })
+          .catch(function (err) {
+            submitBtn.disabled = false;
+            forceBtn.disabled = false;
+            if (err.warning && err.code === 'mixed_channel_warning') {
+              document.getElementById('risk-warning-msg').textContent = err.error || '混合渠道可能影响路由质量';
+              document.getElementById('risk-warning-box').style.display = 'block';
+              reportResize();
+              return;
+            }
+            showNotice('切换平台失败: ' + (err.error || err.message || '操作未完成'), 'error');
+          });
+      }
+
+      document.getElementById('btn-refresh').addEventListener('click', loadAccounts);
+      document.getElementById('select-account').addEventListener('change', function (e) {
+        onSelectAccount(e.target.value);
+      });
+      document.getElementById('btn-submit').addEventListener('click', function () {
+        submitPlatformChange(false);
+      });
+      document.getElementById('btn-force-submit').addEventListener('click', function () {
+        submitPlatformChange(true);
+      });
+
+      // 初始化
+      notifyHostReady();
+      loadAccounts();
+    })();
+  </script>
+</body>
+</html>

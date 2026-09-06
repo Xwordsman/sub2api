@@ -137,6 +137,26 @@ type AdminService interface {
 	ResetAccountQuota(ctx context.Context, id int64) error
 }
 
+// ChangeAccountPlatformInput describes an in-place account platform change.
+// It is intentionally separate from UpdateAccountInput: platform changes use
+// a new provider's credentials and must never run the old provider's merge or
+// runtime-preservation rules.
+type ChangeAccountPlatformInput struct {
+	Platform              string
+	Type                  string
+	Credentials           map[string]any
+	Extra                 map[string]any
+	GroupIDs              *[]int64
+	SkipMixedChannelCheck bool
+}
+
+// AccountPlatformChanger is an additive capability implemented by the admin
+// service.  Keeping it separate from AdminService avoids breaking narrow test
+// doubles and lets external plugin bridges opt into the operation explicitly.
+type AccountPlatformChanger interface {
+	ChangeAccountPlatform(ctx context.Context, id int64, input *ChangeAccountPlatformInput) (*Account, error)
+}
+
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
 	Email                string

@@ -4,7 +4,7 @@
   "title": "Sub2API Plugin Manifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "id", "name", "version", "requires", "capabilities", "runtimes", "ui", "files"],
+  "required": ["schema_version", "id", "name", "version", "requires", "capabilities", "ui", "files"],
   "properties": {
     "schema_version": { "const": 1 },
     "id": { "type": "string", "maxLength": 160, "pattern": "^[a-z0-9]+([._-][a-z0-9]+)+$" },
@@ -33,15 +33,31 @@
         "additionalProperties": false,
         "required": ["id", "platform", "account_type"],
         "properties": {
-          "id": { "const": "openai.oauth.outbound_transport.v1" },
-          "platform": { "const": "openai" },
-          "account_type": { "const": "oauth" }
-        }
+          "id": { "type": "string" },
+          "platform": { "type": "string" },
+          "account_type": { "type": "string" }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "id": { "const": "openai.oauth.outbound_transport.v1" },
+              "platform": { "const": "openai" },
+              "account_type": { "const": "oauth" }
+            }
+          },
+          {
+            "properties": {
+              "id": { "const": "admin.account.management.v1" },
+              "platform": { "const": "admin" },
+              "account_type": { "const": "account_management" }
+            }
+          }
+        ]
       }
     },
     "runtimes": {
       "type": "object",
-      "minProperties": 1,
+      "minProperties": 0,
       "patternProperties": {
         "^[a-z0-9]+-[a-z0-9]+$": {
           "type": "object",
@@ -60,7 +76,7 @@
     },
     "files": {
       "type": "object",
-      "minProperties": 2,
+      "minProperties": 1,
       "propertyNames": { "$ref": "#/$defs/safePath" },
       "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
     }

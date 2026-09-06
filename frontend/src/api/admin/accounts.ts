@@ -6,6 +6,8 @@
 import { apiClient } from '../client'
 import type {
   Account,
+  AccountPlatform,
+  AccountType,
   CreateAccountRequest,
   UpdateAccountRequest,
   PaginatedResponse,
@@ -234,6 +236,25 @@ export async function duplicate(id: number): Promise<Account> {
  */
 export async function update(id: number, updates: UpdateAccountRequest): Promise<Account> {
   const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, updates)
+  return data
+}
+
+export interface ChangeAccountPlatformRequest {
+  platform: AccountPlatform
+  type?: AccountType
+  credentials: Record<string, unknown>
+  extra?: Record<string, unknown>
+  /** Explicitly supplied, including [] to clear all group bindings. */
+  group_ids: number[]
+  confirm_mixed_channel_risk?: boolean
+}
+
+/** Replace an account provider in place without creating a second account. */
+export async function changePlatform(
+  id: number,
+  payload: ChangeAccountPlatformRequest
+): Promise<Account> {
+  const { data } = await apiClient.patch<Account>(`/admin/accounts/${id}/platform`, payload)
   return data
 }
 
@@ -1053,6 +1074,7 @@ export const accountsAPI = {
   create,
   duplicate,
   update,
+  changePlatform,
   checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,

@@ -435,6 +435,108 @@ func (r *accountRepository) Update(ctx context.Context, account *service.Account
 	return r.updateAccount(ctx, account, nil, nil, account.RateMultiplier)
 }
 
+// ChangePlatformInPlace persists a provider-identity change, transient-state
+// reset, group bindings, and the scheduler outbox event in one transaction.
+// The admin service exposes this as an optional capability so lightweight
+// repository test doubles can continue using the compatibility sequence.
+func (r *accountRepository) ChangePlatformInPlace(ctx context.Context, account *service.Account, groupIDs []int64) error {
+	if account == nil {
+		return service.ErrAccountNilInput
+	}
+
+	baseCtx := ctx
+	contextTx := dbent.TxFromContext(ctx)
+	client := r.client
+	var tx *dbent.Tx
+	if contextTx != nil {
+		client = contextTx.Client()
+	} else {
+		var err error
+		tx, err = r.client.Tx(ctx)
+		if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+			return err
+		}
+		if tx != nil {
+			defer func() { _ = tx.Rollback() }()
+			ctx = dbent.NewTxContext(ctx, tx)
+			client = tx.Client()
+		}
+	}
+
+	// Capture the previous binding set using the same transactional client so
+	// the outbox payload can invalidate both old and new scheduler snapshots.
+	entries, err := client.AccountGroup.Query().
+		Where(dbaccountgroup.AccountIDEQ(account.ID)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	existingGroupIDs := make([]int64, 0, len(entries))
+	for _, entry := range entries {
+		existingGroupIDs = append(existingGroupIDs, entry.GroupID)
+	}
+
+	updated, err := r.updateLockedAccount(ctx, client, account, nil, nil, account.RateMultiplier)
+	if err != nil {
+		return translatePersistenceError(err, service.ErrAccountNotFound, nil)
+	}
+
+	// updateLockedAccount intentionally leaves temp-unschedulable state to the
+	// dedicated clearing path.  Clear all scheduler/provider observations here
+	// while still inside the same transaction as the identity update.
+	result, err := client.ExecContext(ctx, `
+		UPDATE accounts
+		SET temp_unschedulable_until = NULL,
+			temp_unschedulable_reason = NULL,
+			extra = COALESCE(extra, '{}'::jsonb)
+				- 'model_rate_limits'
+				- 'antigravity_quota_scopes',
+			updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`, account.ID)
+	if err != nil {
+		return err
+	}
+	if affected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+
+	if _, err := client.AccountGroup.Delete().
+		Where(dbaccountgroup.AccountIDEQ(account.ID)).
+		Exec(ctx); err != nil {
+		return err
+	}
+	if len(groupIDs) > 0 {
+		builders := make([]*dbent.AccountGroupCreate, 0, len(groupIDs))
+		for i, groupID := range groupIDs {
+			builders = append(builders, client.AccountGroup.Create().
+				SetAccountID(account.ID).
+				SetGroupID(groupID).
+				SetPriority(i+1))
+		}
+		if _, err := client.AccountGroup.CreateBulk(builders...).Save(ctx); err != nil {
+			return err
+		}
+	}
+
+	account.UpdatedAt = updated.UpdatedAt
+	account.GroupIDs = append([]int64(nil), groupIDs...)
+	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerGroupPayload(mergeGroupIDs(existingGroupIDs, groupIDs))); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	if contextTx == nil {
+		r.syncSchedulerAccountSnapshot(baseCtx, account.ID)
+	}
+	return nil
+}
+
 // UpdateWithAccountBillingSettings applies an admin account edit while
 // preserving a concurrently probe-synchronized rate unless the request
 // explicitly includes a manual rate.

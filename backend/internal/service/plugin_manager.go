@@ -143,6 +143,7 @@ func (m *PluginManager) List(ctx context.Context) ([]*PluginInstallation, error)
 	route := m.route.Load()
 	for _, installation := range plugins {
 		installation.Compatibility = EvaluatePluginCompatibility(installation.Manifest, m.hostInfo)
+		installation.RuntimeRequired = installation.Manifest.RequiresRuntime()
 		if runtime := m.runtimes[installation.ID]; runtime != nil && !runtime.client.Exited() {
 			installation.RuntimeHealthy = true
 			installation.RuntimeMessage = "插件进程运行中"
@@ -162,6 +163,7 @@ func (m *PluginManager) Get(ctx context.Context, id int64) (*PluginInstallation,
 		return nil, err
 	}
 	installation.Compatibility = EvaluatePluginCompatibility(installation.Manifest, m.hostInfo)
+	installation.RuntimeRequired = installation.Manifest.RequiresRuntime()
 	m.mu.Lock()
 	runtime := m.runtimes[id]
 	m.mu.Unlock()
@@ -183,7 +185,7 @@ func (m *PluginManager) Install(ctx context.Context, reader io.Reader, installed
 	}
 	var previous *PluginInstallation
 	if existing, getErr := m.repo.GetByKey(ctx, packageInfo.PluginKey); getErr == nil {
-		if existing.State == PluginStateEnabled || hasEnabledOpenAIBinding(existing.Bindings) {
+		if existing.State == PluginStateEnabled || hasEnabledAnyBinding(existing.Bindings) {
 			cleanupErr := m.cleanupInstallationFiles(packageInfo)
 			return nil, errors.Join(errors.New("请先停用当前插件，再上传同 ID 的新版本"), cleanupErr)
 		}
@@ -283,7 +285,7 @@ func (m *PluginManager) reconcileOnce(ctx context.Context) error {
 	}
 	if enabled == nil {
 		for _, installation := range installations {
-			if installation.State != PluginStateStarting || !m.startingStateExpired(installation) {
+			if !installation.Manifest.RequiresRuntime() || installation.State != PluginStateStarting || !m.startingStateExpired(installation) {
 				continue
 			}
 			if err := m.repo.UpdateState(
@@ -432,11 +434,11 @@ func (m *PluginManager) ensureLocalInstallation(ctx context.Context, installatio
 	local := m.localInstallations[installation.ID]
 	m.mu.Unlock()
 	if local != nil && local.BinarySHA256 == installation.BinarySHA256 && local.Version == installation.Version {
-		if err := verifyLocalPluginBinary(local, m.installer.RootDir()); err == nil {
+		if err := verifyLocalPluginInstallation(local, m.installer.RootDir()); err == nil {
 			return mergeLocalInstallation(local, installation), nil
 		}
 	}
-	if err := verifyLocalPluginBinary(installation, m.installer.RootDir()); err == nil {
+	if err := verifyLocalPluginInstallation(installation, m.installer.RootDir()); err == nil {
 		local = mergeLocalInstallation(installation, installation)
 		m.mu.Lock()
 		m.localInstallations[installation.ID] = local
@@ -513,6 +515,9 @@ func samePluginPackage(local, persisted *PluginInstallation) bool {
 }
 
 func verifyLocalPluginBinary(installation *PluginInstallation, root string) error {
+	if installation != nil && !installation.Manifest.RequiresRuntime() {
+		return verifyLocalPluginFiles(installation, root)
+	}
 	if installation == nil {
 		return errors.New("插件安装记录为空")
 	}
@@ -548,6 +553,43 @@ func verifyLocalPluginBinary(installation *PluginInstallation, root string) erro
 	return nil
 }
 
+func verifyLocalPluginInstallation(installation *PluginInstallation, root string) error {
+	return verifyLocalPluginBinary(installation, root)
+}
+
+func verifyLocalPluginFiles(installation *PluginInstallation, root string) error {
+	if installation == nil {
+		return errors.New("plugin installation is nil")
+	}
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	installPath, err := filepath.Abs(installation.InstallPath)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(rootPath, installPath)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return errors.New("plugin installation path is outside the managed root")
+	}
+	for path, expectedHash := range installation.Manifest.Files {
+		fullPath, joinErr := safePluginJoin(installPath, path)
+		if joinErr != nil {
+			return joinErr
+		}
+		data, readErr := os.ReadFile(fullPath)
+		if readErr != nil {
+			return readErr
+		}
+		digest := sha256.Sum256(data)
+		if hex.EncodeToString(digest[:]) != expectedHash {
+			return fmt.Errorf("plugin file hash mismatch: %s", path)
+		}
+	}
+	return nil
+}
+
 func (m *PluginManager) Enable(ctx context.Context, id int64, acceptUntested bool, rolloutPercent int) (*PluginInstallation, error) {
 	m.operationMu.Lock()
 	defer m.operationMu.Unlock()
@@ -558,7 +600,7 @@ func (m *PluginManager) Enable(ctx context.Context, id int64, acceptUntested boo
 	if err != nil {
 		return nil, err
 	}
-	if active := m.route.Load(); active != nil && active.pluginID != id {
+	if active := m.route.Load(); installation.Manifest.RequiresRuntime() && active != nil && active.pluginID != id {
 		return nil, errors.New("OpenAI OAuth 出站能力已有启用插件，请先停用当前插件")
 	}
 	if installation.State == PluginStateEnabled && hasEnabledOpenAIBinding(installation.Bindings) {
@@ -587,6 +629,24 @@ func (m *PluginManager) Enable(ctx context.Context, id int64, acceptUntested boo
 	for index := range installation.Bindings {
 		installation.Bindings[index].Enabled = true
 		installation.Bindings[index].RolloutPercent = rolloutPercent
+	}
+	if !installation.Manifest.RequiresRuntime() {
+		now := time.Now()
+		if err := m.repo.UpdateBindingsAndState(
+			ctx, id, installation.Bindings, PluginStateEnabled, "", &now,
+			installation.State, installation.BinarySHA256,
+		); err != nil {
+			return nil, err
+		}
+		result, err := m.repo.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result.Compatibility = compatibility
+		result.RuntimeHealthy = false
+		result.RuntimeRequired = false
+		result.RuntimeMessage = "静态插件 UI 已启用"
+		return result, nil
 	}
 	if err := m.repo.BeginEnable(ctx, id, installation.BinarySHA256, installation.State); err != nil {
 		return nil, err
@@ -621,6 +681,7 @@ func (m *PluginManager) Enable(ctx context.Context, id int64, acceptUntested boo
 	}
 	result.Compatibility = compatibility
 	result.RuntimeHealthy = true
+	result.RuntimeRequired = true
 	result.RuntimeMessage = "插件进程运行中"
 	return result, nil
 }
@@ -658,7 +719,7 @@ func (m *PluginManager) Delete(ctx context.Context, id int64) error {
 		m.mu.Unlock()
 		return err
 	}
-	if installation.State == PluginStateEnabled || hasEnabledOpenAIBinding(installation.Bindings) {
+	if installation.State == PluginStateEnabled || hasEnabledAnyBinding(installation.Bindings) {
 		m.mu.Unlock()
 		return errors.New("请先停用插件，再执行卸载")
 	}
@@ -720,7 +781,7 @@ func (m *PluginManager) SaveConfig(ctx context.Context, id int64, raw json.RawMe
 	runtime := m.runtimes[id]
 	m.mu.Unlock()
 	temporary := false
-	if runtime == nil {
+	if runtime == nil && installation.Manifest.RequiresRuntime() {
 		installation, err = m.ensureLocalInstallation(ctx, installation)
 		if err != nil {
 			return nil, err
@@ -795,6 +856,9 @@ func (m *PluginManager) Test(ctx context.Context, id int64) (*pluginv1.TestConfi
 		installation, err = m.ensureLocalInstallation(ctx, installation)
 		if err != nil {
 			return nil, err
+		}
+		if !installation.Manifest.RequiresRuntime() {
+			return nil, errors.New("static UI plugins do not provide runtime diagnostics")
 		}
 		runtime, err = m.newRuntime(ctx, installation)
 		if err != nil {
@@ -1071,6 +1135,43 @@ func hasEnabledOpenAIBinding(bindings []PluginBinding) bool {
 		}
 	}
 	return false
+}
+
+func hasEnabledAdminAccountBinding(bindings []PluginBinding) bool {
+	for _, binding := range bindings {
+		if binding.Enabled && binding.Capability == PluginCapabilityAdminAccountManagement &&
+			binding.Platform == PluginCapabilityAdminPlatform && binding.AccountType == PluginCapabilityAdminAccountType {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEnabledAnyBinding(bindings []PluginBinding) bool {
+	for _, binding := range bindings {
+		if binding.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+// HasEnabledCapability lets host integrations gate bridge methods using the
+// persisted binding state rather than trusting a UI-supplied capability name.
+func (m *PluginManager) HasEnabledCapability(ctx context.Context, id int64, capability string) (bool, error) {
+	if m == nil || m.repo == nil {
+		return false, errors.New("plugin manager is not configured")
+	}
+	installation, err := m.repo.GetByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	for _, binding := range installation.Bindings {
+		if binding.Enabled && binding.Capability == capability {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func bindingRollout(bindings []PluginBinding) int {

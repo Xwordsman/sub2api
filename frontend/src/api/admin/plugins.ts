@@ -24,6 +24,7 @@ export interface PluginManifest {
   author?: string
   requires: PluginRequirements
   capabilities: PluginCapability[]
+  runtimes?: Record<string, { path: string }>
   ui: { entrypoint: string }
 }
 
@@ -69,6 +70,7 @@ export interface PluginInstallation {
   compatibility: PluginCompatibility
   runtime_healthy: boolean
   runtime_message: string
+  runtime_required?: boolean
 }
 
 export interface PluginTestResult {

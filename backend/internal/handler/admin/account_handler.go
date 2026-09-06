@@ -152,6 +152,17 @@ type UpdateAccountRequest struct {
 	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
+// ChangeAccountPlatformRequest replaces an account's provider identity while
+// keeping the same account row and durable scheduling settings.
+type ChangeAccountPlatformRequest struct {
+	Platform                string         `json:"platform" binding:"required"`
+	Type                    string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey upstream bedrock service_account"`
+	Credentials             map[string]any `json:"credentials" binding:"required"`
+	Extra                   map[string]any `json:"extra"`
+	GroupIDs                *[]int64       `json:"group_ids"`
+	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"`
+}
+
 // BulkUpdateAccountsRequest represents the payload for bulk editing accounts
 type BulkUpdateAccountsRequest struct {
 	AccountIDs              []int64                   `json:"account_ids"`
@@ -1024,6 +1035,55 @@ func (h *AccountHandler) Update(c *gin.Context) {
 // 探测本身在 goroutine 中执行（会发一次 HTTP 请求到上游），不会阻塞
 // 当前请求。探测错误仅记录日志，不向上下文传播：探测失败时标记保持缺失，
 // 网关会按"现状即证据"默认走 Responses。
+// ChangePlatform handles an in-place provider/platform change.
+// PATCH /api/v1/admin/accounts/:id/platform
+func (h *AccountHandler) ChangePlatform(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	var req ChangeAccountPlatformRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.GroupIDs == nil {
+		response.BadRequest(c, "group_ids must be provided explicitly; use an empty array to clear groups")
+		return
+	}
+
+	changer, ok := h.adminService.(service.AccountPlatformChanger)
+	if !ok {
+		response.Error(c, http.StatusNotImplemented, "account platform change is unavailable")
+		return
+	}
+	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
+	account, err := changer.ChangeAccountPlatform(c.Request.Context(), accountID, &service.ChangeAccountPlatformInput{
+		Platform:              req.Platform,
+		Type:                  req.Type,
+		Credentials:           req.Credentials,
+		Extra:                 req.Extra,
+		GroupIDs:              req.GroupIDs,
+		SkipMixedChannelCheck: skipCheck,
+	})
+	if err != nil {
+		var mixedErr *service.MixedChannelError
+		if errors.As(err, &mixedErr) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "mixed_channel_warning",
+				"message": mixedErr.Error(),
+			})
+			return
+		}
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
+}
+
 func (h *AccountHandler) scheduleOpenAIResponsesProbe(account *service.Account) {
 	if account == nil || account.Type != service.AccountTypeAPIKey ||
 		(account.Platform != service.PlatformOpenAI && !service.IsCNProvider(account.Platform)) {

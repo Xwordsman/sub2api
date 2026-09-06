@@ -109,6 +109,12 @@
                 >
                   {{ t(`admin.plugins.${plugin.state}`) }}
                 </span>
+                <span
+                  v-if="plugin.manifest.capabilities.some((item) => item.id === 'admin.account.management.v1')"
+                  class="rounded bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                >
+                  {{ t("admin.plugins.accountManagementCapability") }}
+                </span>
               </div>
               <p class="mt-1 text-xs text-gray-500">
                 {{ plugin.plugin_key
@@ -239,6 +245,7 @@
             class="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-dark-700"
           >
             <button
+              v-if="requiresRuntime(plugin)"
               type="button"
               class="btn btn-secondary btn-sm"
               :disabled="busyID === plugin.id"
@@ -340,6 +347,7 @@ import {
   type PluginInstallation,
   type PluginUISession,
 } from "@/api/admin";
+import type { AccountPlatform, AccountType } from "@/types";
 import { useAppStore } from "@/stores";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
@@ -361,7 +369,31 @@ interface PluginBridgeMessage {
   height?: unknown;
   level?: unknown;
   message?: unknown;
+  payload?: unknown;
+  filters?: unknown;
+  page?: unknown;
+  page_size?: unknown;
 }
+
+const ADMIN_ACCOUNT_MANAGEMENT_CAPABILITY = "admin.account.management.v1";
+const ACCOUNT_PLATFORMS: readonly AccountPlatform[] = [
+  "anthropic",
+  "openai",
+  "gemini",
+  "antigravity",
+  "grok",
+  "kimi",
+  "zhipu",
+  "deepseek",
+];
+const ACCOUNT_TYPES: readonly AccountType[] = [
+  "oauth",
+  "setup-token",
+  "apikey",
+  "upstream",
+  "bedrock",
+  "service_account",
+];
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -388,6 +420,198 @@ function errorMessage(error: unknown): string {
     );
   }
   return t("common.unknownError");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function pluginHasEnabledCapability(
+  plugin: PluginInstallation,
+  capability: string,
+): boolean {
+  return (
+    plugin.manifest.capabilities.some((item) => item.id === capability) &&
+    plugin.bindings.some(
+      (binding) => binding.capability === capability && binding.enabled,
+    )
+  );
+}
+
+function requireAdminAccountCapability(): void {
+  if (
+    !configPlugin.value ||
+    !pluginHasEnabledCapability(
+      configPlugin.value,
+      ADMIN_ACCOUNT_MANAGEMENT_CAPABILITY,
+    )
+  ) {
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+}
+
+function positiveInteger(value: unknown, fallback: number, max: number): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    return fallback;
+  }
+  return Math.min(max, value);
+}
+
+function parseAccountListFilters(value: unknown): {
+  platform?: string;
+  type?: string;
+  status?: string;
+  group?: string;
+  search?: string;
+  privacy_mode?: string;
+  lite?: string;
+  include_scheduler_score?: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+} {
+  if (value === undefined) return {};
+  if (!isRecord(value)) throw new Error(t("admin.plugins.accountBridgeRejected"));
+  const allowed = new Set([
+    "platform",
+    "type",
+    "status",
+    "group",
+    "search",
+    "privacy_mode",
+    "lite",
+    "include_scheduler_score",
+    "sort_by",
+    "sort_order",
+  ]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key))
+      throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+  const result: ReturnType<typeof parseAccountListFilters> = {};
+  for (const key of allowed) {
+    const raw = value[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "string" || raw.length > 200)
+      throw new Error(t("admin.plugins.accountBridgeRejected"));
+    if (key === "sort_order" && raw !== "asc" && raw !== "desc")
+      throw new Error(t("admin.plugins.accountBridgeRejected"));
+    ;(result as Record<string, string>)[key] = raw;
+  }
+  return result;
+}
+
+function parseAccountIDPayload(payload: unknown): number {
+  if (!isRecord(payload) || Object.keys(payload).some((key) => key !== "id")) {
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+  const id = payload.id;
+  if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+  return id;
+}
+
+function parsePlatformUpdatePayload(payload: unknown): {
+  id: number;
+  platform: AccountPlatform;
+  type?: AccountType;
+  credentials: Record<string, unknown>;
+  extra: Record<string, unknown>;
+  group_ids: number[];
+  confirm_mixed_channel_risk?: boolean;
+} {
+  if (!isRecord(payload))
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  const allowed = new Set([
+    "id",
+    "platform",
+    "type",
+    "credentials",
+    "extra",
+    "group_ids",
+    "confirm_mixed_channel_risk",
+  ]);
+  if (Object.keys(payload).some((key) => !allowed.has(key)))
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  const id = parseAccountIDPayload({ id: payload.id });
+  if (
+    typeof payload.platform !== "string" ||
+    !ACCOUNT_PLATFORMS.includes(payload.platform as AccountPlatform)
+  ) {
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+  let type: AccountType | undefined;
+  if (payload.type !== undefined) {
+    if (
+      typeof payload.type !== "string" ||
+      !ACCOUNT_TYPES.includes(payload.type as AccountType)
+    ) {
+      throw new Error(t("admin.plugins.accountBridgeRejected"));
+    }
+    type = payload.type as AccountType;
+  }
+  if (!isRecord(payload.credentials) || Object.keys(payload.credentials).length === 0)
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  const extra = payload.extra === undefined ? {} : payload.extra;
+  if (!isRecord(extra)) throw new Error(t("admin.plugins.accountBridgeRejected"));
+  if (!Array.isArray(payload.group_ids))
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  const groupIDs = payload.group_ids.map((groupID) => {
+    if (typeof groupID !== "number" || !Number.isSafeInteger(groupID) || groupID <= 0)
+      throw new Error(t("admin.plugins.accountBridgeRejected"));
+    return groupID;
+  });
+  if (
+    payload.confirm_mixed_channel_risk !== undefined &&
+    typeof payload.confirm_mixed_channel_risk !== "boolean"
+  ) {
+    throw new Error(t("admin.plugins.accountBridgeRejected"));
+  }
+  return {
+    id,
+    platform: payload.platform as AccountPlatform,
+    type,
+    credentials: payload.credentials,
+    extra,
+    group_ids: groupIDs,
+    confirm_mixed_channel_risk: payload.confirm_mixed_channel_risk as
+      | boolean
+      | undefined,
+  };
+}
+
+function bridgeErrorPayload(error: unknown): Record<string, unknown> {
+  const source = (error ?? {}) as {
+    code?: unknown;
+    reason?: unknown;
+    error?: unknown;
+    message?: unknown;
+    status?: unknown;
+    response?: { data?: unknown; status?: unknown };
+  };
+  const responseData = isRecord(source.response?.data)
+    ? source.response?.data
+    : undefined;
+  const code =
+    typeof source.code === "string"
+      ? source.code
+      : typeof source.reason === "string"
+        ? source.reason
+        : typeof source.error === "string"
+          ? source.error
+          : typeof responseData?.code === "string"
+            ? responseData.code
+            : typeof responseData?.error === "string"
+              ? responseData.error
+              : undefined;
+  const message =
+    typeof source.message === "string"
+      ? source.message
+      : typeof responseData?.message === "string"
+        ? responseData.message
+        : t("common.unknownError");
+  const warning = code === "mixed_channel_warning";
+  return { error: message, ...(code ? { code } : {}), ...(warning ? { warning: true } : {}) };
 }
 
 function reportSensitiveActionError(error: unknown): void {
@@ -442,6 +666,12 @@ function currentRollout(plugin: PluginInstallation): number {
     plugin.bindings.find(
       (binding) => binding.capability === "openai.oauth.outbound_transport.v1",
     )?.rollout_percent || 100
+  );
+}
+
+function requiresRuntime(plugin: PluginInstallation): boolean {
+  return plugin.manifest.capabilities.some(
+    (capability) => capability.id === "openai.oauth.outbound_transport.v1",
   );
 }
 
@@ -611,7 +841,10 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
   const expectsResponse =
     message.type === "config.load" ||
     message.type === "config.save" ||
-    message.type === "config.test";
+    message.type === "config.test" ||
+    message.type === "account.list" ||
+    message.type === "account.get" ||
+    message.type === "account.platform.update";
   if (expectsResponse) {
     if (!requestID || pendingBridgeRequests.has(requestID)) return;
     registerBridgeRequest(requestID);
@@ -657,6 +890,40 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         else appStore.showError(result.message || t("common.error"));
         break;
       }
+      case "account.list": {
+        requireAdminAccountCapability();
+        const page = positiveInteger(message.page, 1, 1000000);
+        const pageSize = positiveInteger(message.page_size, 50, 200);
+        const filters = parseAccountListFilters(message.filters);
+        const accounts = await adminAPI.accounts.list(page, pageSize, filters);
+        postBridgeResult(message, { ok: true, data: accounts });
+        break;
+      }
+      case "account.get": {
+        requireAdminAccountCapability();
+        const account = await adminAPI.accounts.getById(
+          parseAccountIDPayload(message.payload),
+        );
+        postBridgeResult(message, { ok: true, account });
+        break;
+      }
+      case "account.platform.update": {
+        requireAdminAccountCapability();
+        const payload = parsePlatformUpdatePayload(message.payload);
+        const account = await pluginStepUp.run(() =>
+          adminAPI.accounts.changePlatform(payload.id, {
+            platform: payload.platform,
+            type: payload.type,
+            credentials: payload.credentials,
+            extra: payload.extra,
+            group_ids: payload.group_ids,
+            confirm_mixed_channel_risk: payload.confirm_mixed_channel_risk,
+          }),
+        );
+        postBridgeResult(message, { ok: true, account });
+        appStore.showSuccess(t("admin.plugins.accountUpdateSuccess"));
+        break;
+      }
       case "ui.resize": {
         const height = Number(message.height);
         if (Number.isFinite(height))
@@ -677,10 +944,12 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
     }
   } catch (error: unknown) {
     if (isStepUpBlocked(error)) reportSensitiveActionError(error);
-    postBridgeResult(message, {
-      ok: false,
-      error: isStepUpCancelled(error) ? t("common.cancel") : errorMessage(error),
-    });
+    postBridgeResult(
+      message,
+      isStepUpCancelled(error)
+        ? { ok: false, error: t("common.cancel"), code: "STEP_UP_CANCELLED" }
+        : { ok: false, ...bridgeErrorPayload(error) },
+    );
   }
 }
 

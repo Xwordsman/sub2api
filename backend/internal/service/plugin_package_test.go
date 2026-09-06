@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -33,8 +34,44 @@ func TestPluginPackageInstallerInstallUnsignedDevelopmentPackage(t *testing.T) {
 	assert.FileExists(t, installation.ArtifactPath)
 	info, statErr := os.Stat(installation.BinaryPath)
 	require.NoError(t, statErr)
-	assert.NotZero(t, info.Mode()&0o100)
+	// Windows does not expose the POSIX executable permission bits through
+	// os.FileMode; the installer still launches the file via CreateProcess.
+	if runtime.GOOS != "windows" {
+		assert.NotZero(t, info.Mode()&0o100)
+	}
 	assert.Contains(t, installation.InstallPath, filepath.Join("installed", "com.example.openai-transport"))
+}
+
+func TestPluginPackageInstallerAllowsStaticAdminUIWithoutRuntime(t *testing.T) {
+	cfg := testPluginConfig(t.TempDir(), true)
+	installer := NewPluginPackageInstaller(cfg, PluginHostInfo{Version: "0.1.179", BuildType: "release"})
+	manifest := testAdminPluginManifest()
+	archive := buildPluginArchive(t, manifest, nil, "", nil)
+
+	installation, err := installer.Install(context.Background(), bytes.NewReader(archive), nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, installation.BinaryPath)
+	assert.Empty(t, installation.BinarySHA256)
+	assert.True(t, installation.Manifest.HasAdminAccountManagementCapability())
+	assert.False(t, installation.Manifest.RequiresRuntime())
+	assert.FileExists(t, filepath.Join(installation.InstallPath, "ui", "index.html"))
+}
+
+func TestPluginPackageInstallerInstallsAccountPlatformManagerSample(t *testing.T) {
+	pkgPath := filepath.Join("..", "..", "..", "plugins", "account-platform-manager", "account-platform-manager.s2plugin")
+	raw, err := os.ReadFile(pkgPath)
+	if err != nil {
+		t.Skip("sample package not found")
+	}
+	cfg := testPluginConfig(t.TempDir(), true)
+	installer := NewPluginPackageInstaller(cfg, PluginHostInfo{Version: "0.1.179", BuildType: "release"})
+	installation, err := installer.Install(context.Background(), bytes.NewReader(raw), nil)
+	require.NoError(t, err)
+	assert.Equal(t, "com.sub2api.account-platform-manager", installation.Manifest.ID)
+	assert.True(t, installation.Manifest.HasAdminAccountManagementCapability())
+	assert.False(t, installation.Manifest.RequiresRuntime())
+	assert.FileExists(t, filepath.Join(installation.InstallPath, "ui", "index.html"))
 }
 
 func TestPluginPackageInstallerAllowsRepeatedIdenticalUpload(t *testing.T) {
@@ -189,6 +226,34 @@ func testPluginManifest(files map[string][]byte) PluginManifest {
 		},
 		UI:    PluginUIManifest{Entrypoint: "ui/index.html"},
 		Files: hashes,
+	}
+}
+
+func testAdminPluginManifest() PluginManifest {
+	data := []byte("<html></html>")
+	digest := sha256.Sum256(data)
+	return PluginManifest{
+		SchemaVersion: 1,
+		ID:            "com.example.account-management",
+		Name:          "Test Account Management UI",
+		Version:       "0.1.0",
+		Requires: PluginRequirements{
+			Sub2API:               ">=0.1.170 <0.2.0",
+			TestedSub2APIVersions: []string{"0.1.179"},
+			PluginProtocol:        pluginv1.ProtocolVersion,
+			TransportAPI:          pluginv1.TransportAPIVersion,
+			UIBridge:              pluginv1.UIBridgeVersion,
+		},
+		Capabilities: []PluginCapability{{
+			ID:          PluginCapabilityAdminAccountManagement,
+			Platform:    PluginCapabilityAdminPlatform,
+			AccountType: PluginCapabilityAdminAccountType,
+		}},
+		Runtimes: nil,
+		UI:       PluginUIManifest{Entrypoint: "ui/index.html"},
+		Files: map[string]string{
+			"ui/index.html": hex.EncodeToString(digest[:]),
+		},
 	}
 }
 

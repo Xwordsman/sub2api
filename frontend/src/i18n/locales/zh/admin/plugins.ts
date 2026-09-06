@@ -1,5 +1,8 @@
 export default {
   plugins: {
+    accountBridgeRejected: '插件未启用账号管理能力，或请求格式无效。',
+    accountManagementCapability: '账号管理 UI',
+    accountUpdateSuccess: '账号平台已原地更新',
     title: '插件管理',
     description: '安装和管理独立运行的 OAuth 出站传输插件。API Key 流程不受影响。',
     upload: '安装插件',

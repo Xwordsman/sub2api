@@ -15,14 +15,17 @@ import (
 )
 
 const (
-	PluginCapabilityOpenAIOAuthOutbound = "openai.oauth.outbound_transport.v1"
-	PluginStateDisabled                 = "disabled"
-	PluginStateStarting                 = "starting"
-	PluginStateEnabled                  = "enabled"
-	PluginStateError                    = "error"
-	PluginStateIncompatible             = "incompatible"
-	PluginSignatureTrusted              = "trusted"
-	PluginSignatureUnsigned             = "unsigned"
+	PluginCapabilityOpenAIOAuthOutbound    = "openai.oauth.outbound_transport.v1"
+	PluginCapabilityAdminAccountManagement = "admin.account.management.v1"
+	PluginCapabilityAdminPlatform          = "admin"
+	PluginCapabilityAdminAccountType       = "account_management"
+	PluginStateDisabled                    = "disabled"
+	PluginStateStarting                    = "starting"
+	PluginStateEnabled                     = "enabled"
+	PluginStateError                       = "error"
+	PluginStateIncompatible                = "incompatible"
+	PluginSignatureTrusted                 = "trusted"
+	PluginSignatureUnsigned                = "unsigned"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)+$`)
@@ -112,6 +115,7 @@ type PluginInstallation struct {
 	Compatibility   PluginCompatibility `json:"compatibility"`
 	RuntimeHealthy  bool                `json:"runtime_healthy"`
 	RuntimeMessage  string              `json:"runtime_message"`
+	RuntimeRequired bool                `json:"runtime_required"`
 }
 
 type PluginBinding struct {
@@ -144,7 +148,53 @@ func (m PluginManifest) RuntimeKey() string {
 	return runtime.GOOS + "-" + runtime.GOARCH
 }
 
+func isOpenAITransportCapability(capability PluginCapability) bool {
+	return capability.ID == PluginCapabilityOpenAIOAuthOutbound &&
+		capability.Platform == PlatformOpenAI &&
+		capability.AccountType == AccountTypeOAuth
+}
+
+func isAdminAccountManagementCapability(capability PluginCapability) bool {
+	return capability.ID == PluginCapabilityAdminAccountManagement &&
+		capability.Platform == PluginCapabilityAdminPlatform &&
+		capability.AccountType == PluginCapabilityAdminAccountType
+}
+
+// HasTransportCapability reports whether this manifest requires a process
+// runtime. Only transport capabilities participate in runtime lifecycle and
+// request routing.
+func (m PluginManifest) HasTransportCapability() bool {
+	for _, capability := range m.Capabilities {
+		if isOpenAITransportCapability(capability) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAdminAccountManagementCapability reports whether the manifest may use the
+// host-mediated account management bridge.
+func (m PluginManifest) HasAdminAccountManagementCapability() bool {
+	for _, capability := range m.Capabilities {
+		if isAdminAccountManagementCapability(capability) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m PluginManifest) RequiresRuntime() bool {
+	return m.HasTransportCapability()
+}
+
 func (m PluginManifest) Validate() error {
+	seenCapabilities := make(map[string]struct{}, len(m.Capabilities))
+	for _, capability := range m.Capabilities {
+		if _, duplicate := seenCapabilities[capability.ID]; duplicate {
+			return fmt.Errorf("duplicate plugin capability: %s", capability.ID)
+		}
+		seenCapabilities[capability.ID] = struct{}{}
+	}
 	if m.SchemaVersion != 1 {
 		return fmt.Errorf("不支持的插件清单版本: %d", m.SchemaVersion)
 	}
@@ -169,13 +219,18 @@ func (m PluginManifest) Validate() error {
 		return errors.New("插件必须声明至少一个能力")
 	}
 	for _, capability := range m.Capabilities {
-		if capability.ID != PluginCapabilityOpenAIOAuthOutbound || capability.Platform != PlatformOpenAI || capability.AccountType != AccountTypeOAuth {
+		if !isOpenAITransportCapability(capability) && !isAdminAccountManagementCapability(capability) {
 			return fmt.Errorf("初期仅支持能力 %s", PluginCapabilityOpenAIOAuthOutbound)
 		}
 	}
 	runtimeEntry, ok := m.Runtimes[m.RuntimeKey()]
-	if !ok || !safePluginRelativePath(runtimeEntry.Path) {
+	if m.RequiresRuntime() && (!ok || !safePluginRelativePath(runtimeEntry.Path)) {
 		return fmt.Errorf("插件不支持当前运行平台 %s", m.RuntimeKey())
+	}
+	for runtimeKey, runtimeEntry := range m.Runtimes {
+		if !regexp.MustCompile(`^[a-z0-9]+-[a-z0-9]+$`).MatchString(runtimeKey) || !safePluginRelativePath(runtimeEntry.Path) {
+			return fmt.Errorf("invalid plugin runtime declaration: %s", runtimeKey)
+		}
 	}
 	if !safePluginRelativePath(m.UI.Entrypoint) || !strings.HasPrefix(m.UI.Entrypoint, "ui/") {
 		return errors.New("插件 UI 入口必须位于 ui/ 目录")
@@ -188,8 +243,15 @@ func (m PluginManifest) Validate() error {
 			return fmt.Errorf("插件文件声明无效: %s", path)
 		}
 	}
-	if _, ok := m.Files[runtimeEntry.Path]; !ok {
-		return errors.New("运行时二进制未包含在文件哈希声明中")
+	for runtimeKey, runtimeEntry := range m.Runtimes {
+		if _, ok := m.Files[runtimeEntry.Path]; !ok {
+			return fmt.Errorf("runtime file is missing from plugin file declarations: %s", runtimeKey)
+		}
+	}
+	if m.RequiresRuntime() {
+		if _, ok := m.Files[runtimeEntry.Path]; !ok {
+			return errors.New("运行时二进制未包含在文件哈希声明中")
+		}
 	}
 	if _, ok := m.Files[m.UI.Entrypoint]; !ok {
 		return errors.New("UI 入口未包含在文件哈希声明中")

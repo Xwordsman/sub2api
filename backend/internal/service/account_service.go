@@ -126,6 +126,15 @@ type AccountRepository interface {
 	ListShadowsByParent(ctx context.Context, parentID int64) ([]*Account, error)
 }
 
+// AccountPlatformRepository is an optional narrow capability implemented by
+// repositories that can persist a provider-identity change and its group
+// bindings atomically.  Keeping this separate from AccountRepository avoids
+// forcing read-only/test doubles to grow a transaction-specific method; the
+// admin service falls back to the legacy sequence when it is unavailable.
+type AccountPlatformRepository interface {
+	ChangePlatformInPlace(ctx context.Context, account *Account, groupIDs []int64) error
+}
+
 type AccountDuplicateRepository interface {
 	// CreateWithAccountGroups atomically persists an account, its exact group priorities,
 	// and the scheduler outbox event for the new routing snapshot.
