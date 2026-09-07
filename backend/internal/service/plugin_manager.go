@@ -1137,16 +1137,6 @@ func hasEnabledOpenAIBinding(bindings []PluginBinding) bool {
 	return false
 }
 
-func hasEnabledAdminAccountBinding(bindings []PluginBinding) bool {
-	for _, binding := range bindings {
-		if binding.Enabled && binding.Capability == PluginCapabilityAdminAccountManagement &&
-			binding.Platform == PluginCapabilityAdminPlatform && binding.AccountType == PluginCapabilityAdminAccountType {
-			return true
-		}
-	}
-	return false
-}
-
 func hasEnabledAnyBinding(bindings []PluginBinding) bool {
 	for _, binding := range bindings {
 		if binding.Enabled {

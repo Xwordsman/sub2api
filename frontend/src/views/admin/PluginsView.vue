@@ -495,7 +495,8 @@ function parseAccountListFilters(value: unknown): {
       throw new Error(t("admin.plugins.accountBridgeRejected"));
     if (key === "sort_order" && raw !== "asc" && raw !== "desc")
       throw new Error(t("admin.plugins.accountBridgeRejected"));
-    ;(result as Record<string, string>)[key] = raw;
+    const typedResult = result as Record<string, string>;
+    typedResult[key] = raw;
   }
   return result;
 }
