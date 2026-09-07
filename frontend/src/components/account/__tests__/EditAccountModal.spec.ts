@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 
-const { updateAccountMock, changePlatformMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
-  changePlatformMock: vi.fn(),
+const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
   updateAccountMock: vi.fn(),
   checkMixedChannelRiskMock: vi.fn(),
   authIsSimpleMode: { value: true }
@@ -29,7 +28,6 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
       update: updateAccountMock,
-      changePlatform: changePlatformMock,
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
@@ -317,7 +315,6 @@ function mountModal(account = buildAccount()) {
         BaseDialog: BaseDialogStub,
         Select: SelectStub,
         Icon: true,
-        PlatformIcon: true,
         ProxySelector: true,
         GroupSelector: GroupSelectorStub,
         ModelWhitelistSelector: ModelWhitelistSelectorStub
@@ -1456,77 +1453,6 @@ describe('EditAccountModal OpenAI 自动使用重置卡', () => {
     await wrapper.get('[data-testid="auto-reset-credit-5h-threshold"]').setValue('0')
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
     expect(updateAccountMock).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-})
-
-
-describe('EditAccountModal 原地切换厂商与类型', () => {
-  it('在编辑账号弹窗中渲染全部 8 大平台选择按钮', () => {
-    const wrapper = mountModal(buildAccount())
-    expect(wrapper.find('[data-testid="edit-platform-anthropic"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-openai"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-gemini"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-antigravity"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-grok"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-kimi"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-zhipu"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-platform-deepseek"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="platform-change-section"]').exists()).toBe(false)
-    wrapper.unmount()
-  })
-
-  it('切换到新厂商时展示原地切换说明与新凭据输入项', async () => {
-    const wrapper = mountModal(buildAccount())
-    await wrapper.get('[data-testid="edit-platform-anthropic"]').trigger('click')
-    expect(wrapper.find('[data-testid="platform-change-section"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-new-api-key"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="edit-new-base-url"]').exists()).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('提交切换请求时调用 changePlatform 并在成功后同步账号属性', async () => {
-    const account = buildAccount()
-    changePlatformMock.mockReset()
-    updateAccountMock.mockReset()
-    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
-
-    const changedAccount = {
-      ...account,
-      platform: 'anthropic',
-      type: 'apikey',
-      credentials: { api_key: 'sk-ant-test', base_url: 'https://api.anthropic.com' }
-    }
-    changePlatformMock.mockResolvedValue(changedAccount)
-    updateAccountMock.mockResolvedValue(changedAccount)
-
-    const wrapper = mountModal(account)
-    await wrapper.get('[data-testid="edit-platform-anthropic"]').trigger('click')
-    await wrapper.get('[data-testid="edit-new-api-key"]').setValue('sk-ant-new-key')
-    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
-
-    expect(changePlatformMock).toHaveBeenCalledTimes(1)
-    expect(changePlatformMock).toHaveBeenCalledWith(account.id, expect.objectContaining({
-      platform: 'anthropic',
-      type: 'apikey',
-      credentials: expect.objectContaining({
-        api_key: 'sk-ant-new-key',
-        base_url: 'https://api.anthropic.com'
-      }),
-      group_ids: []
-    }))
-    expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(wrapper.emitted('updated')).toBeTruthy()
-    wrapper.unmount()
-  })
-
-  it('切换回原平台和接入类型时恢复原有编辑视图', async () => {
-    const wrapper = mountModal(buildAccount())
-    await wrapper.get('[data-testid="edit-platform-anthropic"]').trigger('click')
-    expect(wrapper.find('[data-testid="platform-change-section"]').exists()).toBe(true)
-
-    await wrapper.get('[data-testid="edit-platform-openai"]').trigger('click')
-    expect(wrapper.find('[data-testid="platform-change-section"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })
