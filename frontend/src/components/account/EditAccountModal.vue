@@ -250,9 +250,10 @@
           <CnBaseUrlPresets
             v-if="isNewCNPlatform"
             class="mt-2"
-            :platform="targetPlatform as any"
+            :platform="newCnPresetPlatform"
             :mode="newPlatformCnMode"
-            @select="newPlatformBaseUrl = $event"
+            :current-url="newPlatformBaseUrl"
+            @select="onNewPlatformCnPresetSelect"
           />
         </div>
 
@@ -3313,6 +3314,14 @@ const isNewCNPlatform = computed(() => {
   return ['kimi', 'zhipu', 'deepseek'].includes(targetPlatform.value)
 })
 
+const newCnPresetPlatform = computed<'kimi' | 'zhipu' | 'deepseek'>(() => {
+  const platform = targetPlatform.value
+  if (platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek') {
+    return platform
+  }
+  return 'kimi'
+})
+
 const defaultNewBaseUrl = computed(() => {
   switch (targetPlatform.value) {
     case 'openai': return 'https://api.openai.com'
@@ -3559,6 +3568,11 @@ function onCnPresetSelect(preset: { mode: CnAccountMode; protocol: CnApiProtocol
   editAccountMode.value = preset.mode
   editApiProtocol.value = preset.protocol
   editBaseUrl.value = preset.url
+}
+
+function onNewPlatformCnPresetSelect(preset: { mode: CnAccountMode; protocol: CnApiProtocol; url: string }) {
+  newPlatformCnMode.value = preset.mode
+  newPlatformBaseUrl.value = preset.url
 }
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
