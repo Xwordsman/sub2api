@@ -26,6 +26,427 @@
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
       </div>
 
+      <!-- Platform Selection -->
+      <div v-if="!isSparkShadow">
+        <div class="flex items-center justify-between">
+          <label class="input-label mb-0">{{ t('admin.accounts.platform') }}</label>
+          <span
+            v-if="isPlatformOrTypeChanged"
+            class="text-xs font-medium text-amber-600 dark:text-amber-400"
+          >
+            {{ t('admin.accounts.platformChangedNotice') }}
+          </span>
+        </div>
+        <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700" data-tour="edit-account-platform">
+          <button
+            type="button"
+            data-testid="edit-platform-anthropic"
+            @click="selectTargetPlatform('anthropic')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'anthropic'
+                ? 'bg-white text-orange-600 shadow-sm dark:bg-dark-600 dark:text-orange-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <Icon name="sparkles" size="sm" />
+            Anthropic
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-openai"
+            @click="selectTargetPlatform('openai')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'openai'
+                ? 'bg-white text-green-600 shadow-sm dark:bg-dark-600 dark:text-green-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
+              />
+            </svg>
+            OpenAI
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-gemini"
+            @click="selectTargetPlatform('gemini')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'gemini'
+                ? 'bg-white text-blue-600 shadow-sm dark:bg-dark-600 dark:text-blue-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5L12 2z"
+              />
+            </svg>
+            Gemini
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-antigravity"
+            @click="selectTargetPlatform('antigravity')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'antigravity'
+                ? 'bg-white text-purple-600 shadow-sm dark:bg-dark-600 dark:text-purple-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <Icon name="cloud" size="sm" />
+            Antigravity
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-grok"
+            @click="selectTargetPlatform('grok')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'grok'
+                ? 'bg-white text-zinc-900 shadow-sm dark:bg-dark-600 dark:text-zinc-100'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="grok" size="sm" />
+            Grok
+          </button>
+        </div>
+        <!-- CN providers row: Kimi / Zhipu GLM / DeepSeek -->
+        <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+          <button
+            type="button"
+            data-testid="edit-platform-kimi"
+            @click="selectTargetPlatform('kimi')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'kimi'
+                ? 'bg-white text-pink-600 shadow-sm dark:bg-dark-600 dark:text-pink-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="kimi" size="sm" />
+            Kimi
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-zhipu"
+            @click="selectTargetPlatform('zhipu')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'zhipu'
+                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="zhipu" size="sm" />
+            Zhipu GLM
+          </button>
+          <button
+            type="button"
+            data-testid="edit-platform-deepseek"
+            @click="selectTargetPlatform('deepseek')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              targetPlatform === 'deepseek'
+                ? 'bg-white text-teal-600 shadow-sm dark:bg-dark-600 dark:text-teal-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            DeepSeek
+          </button>
+        </div>
+      </div>
+
+      <!-- Account Type Selection -->
+      <div v-if="!isSparkShadow">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4" data-tour="edit-account-type">
+          <button
+            v-for="tOpt in availableTargetTypes"
+            :key="tOpt.value"
+            type="button"
+            :data-testid="'edit-type-' + tOpt.value"
+            @click="targetType = tOpt.value"
+            :class="[
+              'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+              targetType === tOpt.value
+                ? 'border-primary-500 bg-primary-50 dark:border-primary-500 dark:bg-primary-900/20'
+                : 'border-gray-200 hover:border-gray-300 dark:border-dark-600 dark:hover:border-dark-500'
+            ]"
+          >
+            <div
+              :class="[
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                targetType === tOpt.value
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
+              ]"
+            >
+              <Icon :name="tOpt.icon as any" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ tOpt.label }}</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ tOpt.desc }}</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- In-place switch notice and new credentials form -->
+      <div v-if="isPlatformOrTypeChanged" class="space-y-4" data-testid="platform-change-section">
+        <!-- Notice banner -->
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+          <div class="flex items-start gap-3">
+            <Icon name="exclamationTriangle" size="sm" class="mt-0.5 shrink-0 text-amber-500" />
+            <div>
+              <p class="font-semibold text-amber-900 dark:text-amber-100">
+                {{ t('admin.accounts.platformChangeNoticeTitle') }}
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-amber-800/90 dark:text-amber-200/90">
+                {{ t('admin.accounts.platformChangeNoticeDesc') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Base URL -->
+        <div>
+          <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
+          <input
+            v-model="newPlatformBaseUrl"
+            type="text"
+            class="input"
+            data-testid="edit-new-base-url"
+            :placeholder="defaultNewBaseUrl"
+          />
+          <GrokBaseUrlPresets
+            v-if="targetPlatform === 'grok'"
+            class="mt-2"
+            @select="newPlatformBaseUrl = $event"
+          />
+          <CnBaseUrlPresets
+            v-if="isNewCNPlatform"
+            class="mt-2"
+            :platform="newCnPresetPlatform"
+            :mode="newPlatformCnMode"
+            :current-url="newPlatformBaseUrl"
+            @select="onNewPlatformCnPresetSelect"
+          />
+        </div>
+
+        <!-- API Key / Token input -->
+        <div v-if="targetType === 'apikey' || targetType === 'oauth' || targetType === 'setup-token'">
+          <label class="input-label">
+            {{ targetType === 'apikey' ? t('admin.accounts.apiKey') : t('admin.accounts.tokenOrKey', 'API Key / 访问凭据') }}
+            <span v-if="targetType === 'apikey' && !newPlatformRawJson" class="text-red-500">*</span>
+          </label>
+          <input
+            v-model="newPlatformApiKey"
+            type="password"
+            class="input"
+            autocomplete="off"
+            data-testid="edit-new-api-key"
+            :placeholder="targetType === 'apikey' ? 'sk-...' : '请输入新平台的凭据或令牌'"
+          />
+          <p class="input-hint">
+            {{ t('admin.accounts.newPlatformApiKeyHint') }}
+          </p>
+        </div>
+
+        <!-- Gemini tier selector -->
+        <div v-if="targetPlatform === 'gemini' && targetType === 'apikey'">
+          <label class="input-label">{{ t('admin.accounts.gemini.tier.label') }}</label>
+          <select v-model="newPlatformGeminiTier" class="input" data-testid="edit-new-gemini-tier">
+            <option value="aistudio_paid">{{ t('admin.accounts.gemini.tier.aiStudio.paid') }}</option>
+            <option value="aistudio_free">{{ t('admin.accounts.gemini.tier.aiStudio.free') }}</option>
+          </select>
+        </div>
+
+        <!-- CN providers account mode -->
+        <div v-if="isNewCNPlatform" class="space-y-3">
+          <label class="input-label">{{ t('admin.accounts.cnProviders.accountMode.title') }}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              @click="newPlatformCnMode = 'payg'"
+              :class="[
+                'flex items-center gap-2 rounded-lg border-2 p-2.5 text-left transition-all',
+                newPlatformCnMode === 'payg'
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                  : 'border-gray-200 dark:border-dark-600'
+              ]"
+            >
+              <Icon name="creditCard" size="sm" />
+              <div>
+                <span class="block text-xs font-medium">{{ t('admin.accounts.cnProviders.accountMode.payg') }}</span>
+                <span class="text-[10px] text-gray-500">{{ t('admin.accounts.cnProviders.accountMode.paygDesc') }}</span>
+              </div>
+            </button>
+            <button
+              v-if="targetPlatform !== 'deepseek'"
+              type="button"
+              @click="newPlatformCnMode = 'coding'"
+              :class="[
+                'flex items-center gap-2 rounded-lg border-2 p-2.5 text-left transition-all',
+                newPlatformCnMode === 'coding'
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                  : 'border-gray-200 dark:border-dark-600'
+              ]"
+            >
+              <Icon name="bolt" size="sm" />
+              <div>
+                <span class="block text-xs font-medium">{{ t('admin.accounts.cnProviders.accountMode.coding') }}</span>
+                <span class="text-[10px] text-gray-500">{{ t('admin.accounts.cnProviders.accountMode.codingDesc') }}</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Advanced JSON Credentials -->
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="input-label mb-0">
+              {{ t('admin.accounts.advancedCredentialsJson') }}
+            </label>
+            <span class="text-xs text-gray-500">
+              {{ t('admin.accounts.advancedCredentialsJsonHint') }}
+            </span>
+          </div>
+          <textarea
+            v-model="newPlatformRawJson"
+            rows="3"
+            class="input mt-1 font-mono text-xs"
+            data-testid="edit-new-credentials-json"
+            placeholder='{"api_key": "sk-...", "access_token": "...", "refresh_token": "..."}'
+          ></textarea>
+        </div>
+
+        <!-- 新平台的模型限制：绑定 targetPlatform，切换后仍可为新厂商挑选模型 -->
+        <div
+          v-if="targetPlatform !== 'antigravity'"
+          class="border-t border-gray-200 pt-4 dark:border-dark-600"
+        >
+          <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
+
+          <!-- Mode Toggle -->
+          <div class="mb-4 flex gap-2">
+            <button
+              type="button"
+              data-testid="edit-new-model-mode-whitelist"
+              @click="modelRestrictionMode = 'whitelist'"
+              :class="[
+                'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                modelRestrictionMode === 'whitelist'
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
+              ]"
+            >
+              {{ t('admin.accounts.modelWhitelist') }}
+            </button>
+            <button
+              type="button"
+              data-testid="edit-new-model-mode-mapping"
+              @click="modelRestrictionMode = 'mapping'"
+              :class="[
+                'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                modelRestrictionMode === 'mapping'
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
+              ]"
+            >
+              {{ t('admin.accounts.modelMapping') }}
+            </button>
+          </div>
+
+          <!-- Whitelist Mode -->
+          <div v-if="modelRestrictionMode === 'whitelist'">
+            <ModelWhitelistSelector
+              v-model="allowedModels"
+              :platform="targetPlatform"
+              :account-id="account?.id"
+            />
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
+              <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
+                t('admin.accounts.supportsAllModels')
+              }}</span>
+            </p>
+          </div>
+
+          <!-- Mapping Mode -->
+          <div v-else>
+            <div v-if="modelMappings.length > 0" class="mb-3 space-y-2">
+              <div
+                v-for="(mapping, index) in modelMappings"
+                :key="getModelMappingKey(mapping)"
+                class="flex items-center gap-2"
+              >
+                <input
+                  v-model="mapping.from"
+                  type="text"
+                  class="input flex-1"
+                  :placeholder="t('admin.accounts.requestModel')"
+                />
+                <span class="flex-shrink-0 text-gray-400">&rarr;</span>
+                <input
+                  v-model="mapping.to"
+                  type="text"
+                  class="input flex-1"
+                  :placeholder="t('admin.accounts.actualModel')"
+                />
+                <button
+                  type="button"
+                  @click="removeModelMapping(index)"
+                  class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              @click="addModelMapping"
+              class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-dark-500 dark:text-gray-400 dark:hover:border-dark-400 dark:hover:text-gray-300"
+            >
+              {{ t('admin.accounts.addMapping') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <template v-if="!isPlatformOrTypeChanged">
+
       <!-- API Key fields (only for apikey type) -->
       <div v-if="account.type === 'apikey'" class="space-y-4">
         <div v-if="!isCNApiKeyAccount || editApiProtocol !== 'adaptive'">
@@ -1535,6 +1956,8 @@
         </div>
       </div>
 
+      </template>
+
       <div v-if="!isSparkShadow">
         <div class="mb-1 flex items-center gap-2">
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
@@ -1617,6 +2040,7 @@
         </p>
       </div>
 
+      <template v-if="!isPlatformOrTypeChanged">
       <!-- OpenAI 自动透传开关（OAuth/API Key） -->
       <div
         v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
@@ -2803,12 +3227,14 @@
         </div>
       </div>
 
+      </template>
+
       <!-- Group Selection - 仅标准模式显示 -->
       <GroupSelector
         v-if="!authStore.isSimpleMode"
         v-model="form.group_ids"
         :groups="groups"
-        :platform="account?.platform"
+        :platform="isPlatformOrTypeChanged ? targetPlatform : account?.platform"
         :mixed-scheduling="mixedScheduling"
         data-tour="account-form-groups"
       />
@@ -2847,7 +3273,7 @@
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          {{ submitting ? t('admin.accounts.updating') : t('common.update') }}
+          {{ submitting ? t('admin.accounts.updating') : (isPlatformOrTypeChanged ? t('admin.accounts.confirmPlatformChange') : t('common.update')) }}
         </button>
       </div>
     </template>
@@ -2881,14 +3307,18 @@ import type {
   OpenAICompactMode,
   OpenAIResponsesMode,
   OpenAIEndpointCapability,
-  OllamaCloudUsageState
+  OllamaCloudUsageState,
+  AccountPlatform,
+  AccountType
 } from '@/types'
+import type { ChangeAccountPlatformRequest } from '@/api/admin/accounts'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
@@ -2943,6 +3373,7 @@ import {
   commonErrorCodes,
   buildModelMappingObject,
   splitModelMappingObject,
+  getModelsByPlatform,
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
 
@@ -2966,6 +3397,141 @@ const browserTimeZone = getBrowserTimeZone()
 
 // Spark 影子账号(parent_account_id 非空):代理恒继承母账号,不可独立编辑(外审 B/P1),
 // 故隐藏代理选择器。
+// In-place platform and type change state
+const targetPlatform = ref<AccountPlatform>('anthropic')
+const targetType = ref<AccountType>('apikey')
+const newPlatformApiKey = ref('')
+const newPlatformBaseUrl = ref('')
+const newPlatformRawJson = ref('')
+const newPlatformGeminiTier = ref('aistudio_paid')
+const newPlatformCnMode = ref<'payg' | 'coding'>('payg')
+
+const isPlatformOrTypeChanged = computed(() => {
+  if (!props.account) return false
+  return targetPlatform.value !== props.account.platform || targetType.value !== props.account.type
+})
+
+const isNewCNPlatform = computed(() => {
+  return ['kimi', 'zhipu', 'deepseek'].includes(targetPlatform.value)
+})
+
+const newCnPresetPlatform = computed<'kimi' | 'zhipu' | 'deepseek'>(() => {
+  const platform = targetPlatform.value
+  if (platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek') {
+    return platform
+  }
+  return 'kimi'
+})
+
+const defaultNewBaseUrl = computed(() => {
+  switch (targetPlatform.value) {
+    case 'openai': return 'https://api.openai.com'
+    case 'gemini': return 'https://generativelanguage.googleapis.com'
+    case 'antigravity': return 'https://cloudcode-pa.googleapis.com'
+    case 'grok': return 'https://api.x.ai/v1'
+    case 'kimi': return 'https://api.moonshot.cn'
+    case 'zhipu': return 'https://open.bigmodel.cn'
+    case 'deepseek': return 'https://api.deepseek.com'
+    case 'anthropic':
+    default:
+      return 'https://api.anthropic.com'
+  }
+})
+
+const availableTargetTypes = computed(() => {
+  let list: Array<{ value: AccountType; label: string; desc: string; icon: string }> = []
+  switch (targetPlatform.value) {
+    case 'anthropic':
+      list = [
+        { value: 'apikey', label: t('admin.accounts.apiKey'), desc: t('admin.accounts.claudeConsole'), icon: 'key' },
+        { value: 'oauth', label: 'OAuth', desc: t('admin.accounts.claudeCode'), icon: 'sparkles' },
+        { value: 'setup-token', label: 'Setup Token', desc: t('admin.accounts.oauthSetupToken'), icon: 'sparkles' },
+        { value: 'bedrock', label: 'Bedrock', desc: t('admin.accounts.bedrockDesc'), icon: 'cloud' },
+        { value: 'service_account', label: 'Vertex', desc: 'Service Account', icon: 'cloud' }
+      ]
+      break
+    case 'openai':
+      list = [
+        { value: 'apikey', label: 'API Key', desc: t('admin.accounts.types.responsesApi'), icon: 'key' },
+        { value: 'oauth', label: 'OAuth', desc: t('admin.accounts.types.chatgptOauth'), icon: 'key' }
+      ]
+      break
+    case 'gemini':
+      list = [
+        { value: 'apikey', label: 'API Key', desc: 'Google AI Studio', icon: 'key' },
+        { value: 'oauth', label: 'OAuth', desc: 'Gemini OAuth', icon: 'key' },
+        { value: 'service_account', label: 'Vertex', desc: 'Service Account', icon: 'cloud' }
+      ]
+      break
+    case 'antigravity':
+      list = [
+        { value: 'oauth', label: 'OAuth', desc: 'Cloud Code OAuth', icon: 'cloud' },
+        { value: 'apikey', label: 'API Key', desc: 'API Key', icon: 'key' }
+      ]
+      break
+    case 'grok':
+      list = [
+        { value: 'apikey', label: 'API Key', desc: t('admin.accounts.types.responsesApi'), icon: 'key' },
+        { value: 'oauth', label: 'OAuth', desc: t('admin.accounts.types.grokOauth'), icon: 'key' }
+      ]
+      break
+    case 'kimi':
+    case 'zhipu':
+    case 'deepseek':
+    default:
+      list = [
+        { value: 'apikey', label: 'API Key', desc: t('admin.accounts.apiKey'), icon: 'key' }
+      ]
+      break
+  }
+
+  if (props.account && targetPlatform.value === props.account.platform) {
+    if (!list.some(item => item.value === props.account?.type)) {
+      list.push({
+        value: props.account.type as AccountType,
+        label: props.account.type,
+        desc: '当前类型',
+        icon: 'key'
+      })
+    }
+  }
+  return list
+})
+
+const selectTargetPlatform = (platform: AccountPlatform) => {
+  targetPlatform.value = platform
+  if (props.account && platform === props.account.platform) {
+    targetType.value = props.account.type
+  } else {
+    if (platform === 'antigravity') {
+      targetType.value = 'oauth'
+    } else {
+      targetType.value = 'apikey'
+    }
+  }
+  if (isNewCNPlatform.value) {
+    newPlatformCnMode.value = 'payg'
+  }
+  newPlatformBaseUrl.value = ''
+  syncAllowedModelsWithTargetPlatform(platform)
+}
+
+// 切换平台后旧厂商的模型名（如 claude-*）对新平台无意义，
+// 与新建账号一致地重填目标平台默认模型；切回原平台则恢复账号原有白名单。
+const syncAllowedModelsWithTargetPlatform = (platform: AccountPlatform) => {
+  if (props.account && platform === props.account.platform) {
+    const { allowedModels: originalModels, modelMappings: originalMappings } =
+      splitModelMappingObject(
+        (props.account.credentials?.model_mapping as Record<string, string> | undefined) || null
+      )
+    allowedModels.value = originalModels
+    modelMappings.value = originalMappings
+    return
+  }
+  allowedModels.value = [...getModelsByPlatform(platform)]
+  modelMappings.value = []
+}
+
 const isSparkShadow = computed(() => props.account?.parent_account_id != null)
 
 const hideAccountLongContextBilling = computed(() => {
@@ -3120,6 +3686,11 @@ function onCnPresetSelect(preset: { mode: CnAccountMode; protocol: CnApiProtocol
   editAccountMode.value = preset.mode
   editApiProtocol.value = preset.protocol
   editBaseUrl.value = preset.url
+}
+
+function onNewPlatformCnPresetSelect(preset: { mode: CnAccountMode; protocol: CnApiProtocol; url: string }) {
+  newPlatformCnMode.value = preset.mode
+  newPlatformBaseUrl.value = preset.url
 }
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
@@ -3707,6 +4278,14 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     : 'active'
   form.group_ids = newAccount.group_ids || []
   form.expires_at = newAccount.expires_at ?? null
+
+  targetPlatform.value = (newAccount.platform as AccountPlatform) || 'anthropic'
+  targetType.value = (newAccount.type as AccountType) || 'apikey'
+  newPlatformApiKey.value = ''
+  newPlatformBaseUrl.value = ''
+  newPlatformRawJson.value = ''
+  newPlatformGeminiTier.value = 'aistudio_paid'
+  newPlatformCnMode.value = 'payg'
 
   // Load intercept warmup requests setting (applies to all account types)
   const credentials = newAccount.credentials as Record<string, unknown> | undefined
@@ -4630,9 +5209,160 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
   }
 }
 
+const submitChangeAccountPlatform = async (accountID: number) => {
+  if (!form.name.trim()) {
+    appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
+    return
+  }
+  if (form.status !== 'active' && form.status !== 'inactive' && form.status !== 'error') {
+    appStore.showError(t('admin.accounts.pleaseSelectStatus'))
+    return
+  }
+
+  let credentials: Record<string, unknown> = {}
+  if (newPlatformRawJson.value.trim()) {
+    try {
+      const parsed = JSON.parse(newPlatformRawJson.value.trim())
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        appStore.showError(t('admin.accounts.invalidCredentialsJson'))
+        return
+      }
+      credentials = parsed as Record<string, unknown>
+    } catch (e: any) {
+      appStore.showError(t('admin.accounts.invalidCredentialsJsonFormat') + (e.message || ''))
+      return
+    }
+  }
+
+  if (!credentials.api_key && newPlatformApiKey.value.trim()) {
+    credentials.api_key = newPlatformApiKey.value.trim()
+  }
+
+  const bUrl = newPlatformBaseUrl.value.trim() || defaultNewBaseUrl.value
+  if (!credentials.base_url && bUrl) {
+    credentials.base_url = bUrl
+  }
+
+  if (targetPlatform.value === 'gemini' && targetType.value === 'apikey' && !credentials.tier_id) {
+    credentials.tier_id = newPlatformGeminiTier.value
+  }
+
+  if (isNewCNPlatform.value) {
+    if (!credentials.account_mode) {
+      credentials.account_mode = newPlatformCnMode.value
+    }
+    if (!credentials.api_protocol) {
+      credentials.api_protocol = 'native'
+    }
+  }
+
+  // 模型白名单/映射随切换一并写入新厂商凭据（与新建账号一致）。
+  // changePlatform 整体替换 credentials，不带则新平台会退化为“支持所有模型”。
+  if (targetPlatform.value !== 'antigravity' && !credentials.model_mapping) {
+    const modelMapping = buildModelMappingObject(
+      modelRestrictionMode.value,
+      allowedModels.value,
+      modelMappings.value
+    )
+    if (modelMapping) {
+      credentials.model_mapping = modelMapping
+    }
+  }
+
+  if (targetType.value === 'apikey' && !credentials.api_key && Object.keys(credentials).length === 0) {
+    appStore.showError(t('admin.accounts.apiKeyIsRequired'))
+    return
+  }
+
+  if (Object.keys(credentials).length === 0) {
+    appStore.showError(t('admin.accounts.credentialsRequired'))
+    return
+  }
+
+  // 混合渠道预检
+  const isAntigravityOrAnthropic = targetPlatform.value === 'antigravity' || targetPlatform.value === 'anthropic'
+  if (isAntigravityOrAnthropic && form.group_ids && form.group_ids.length > 0 && !antigravityMixedChannelConfirmed.value) {
+    try {
+      const checkRes = await adminAPI.accounts.checkMixedChannelRisk({
+        platform: targetPlatform.value,
+        group_ids: form.group_ids,
+        account_id: accountID
+      })
+      if (checkRes.has_risk) {
+        openMixedChannelDialog({
+          response: checkRes,
+          onConfirm: async () => {
+            antigravityMixedChannelConfirmed.value = true
+            await submitChangeAccountPlatform(accountID)
+          }
+        })
+        return
+      }
+    } catch {
+      // 忽略探测异常交由后端处理
+    }
+  }
+
+  submitting.value = true
+  try {
+    const changeReq: ChangeAccountPlatformRequest = {
+      platform: targetPlatform.value,
+      type: targetType.value,
+      credentials,
+      group_ids: form.group_ids || [],
+      confirm_mixed_channel_risk: antigravityMixedChannelConfirmed.value
+    }
+
+    const changedAccount = await adminAPI.accounts.changePlatform(accountID, changeReq)
+
+    const updatePayload: Record<string, unknown> = {
+      name: form.name,
+      notes: form.notes,
+      proxy_id: form.proxy_id === null ? 0 : form.proxy_id,
+      concurrency: form.concurrency,
+      load_factor: (!form.load_factor || form.load_factor < 1) ? 0 : form.load_factor,
+      priority: form.priority,
+      status: form.status,
+      expires_at: form.expires_at === null ? 0 : form.expires_at,
+      auto_pause_on_expired: autoPauseOnExpired.value
+    }
+
+    let finalAccount = changedAccount
+    try {
+      finalAccount = await adminAPI.accounts.update(accountID, updatePayload)
+    } catch (updateErr) {
+      console.warn('Failed to update secondary fields after platform change', updateErr)
+    }
+
+    appStore.showSuccess(t('admin.accounts.platformChangeSuccess'))
+    emit('updated', finalAccount)
+    handleClose()
+  } catch (error: any) {
+    if (error.status === 409 && error.error === 'mixed_channel_warning') {
+      openMixedChannelDialog({
+        message: error.message,
+        onConfirm: async () => {
+          antigravityMixedChannelConfirmed.value = true
+          await submitChangeAccountPlatform(accountID)
+        }
+      })
+      return
+    }
+    appStore.showError(error.message || t('admin.accounts.failedToUpdate'))
+  } finally {
+    submitting.value = false
+  }
+}
+
 const handleSubmit = async () => {
   if (!props.account) return
   const accountID = props.account.id
+
+  if (isPlatformOrTypeChanged.value) {
+    await submitChangeAccountPlatform(accountID)
+    return
+  }
+
 
   if (form.status !== 'active' && form.status !== 'inactive' && form.status !== 'error') {
     appStore.showError(t('admin.accounts.pleaseSelectStatus'))
