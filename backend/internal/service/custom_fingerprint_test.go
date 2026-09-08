@@ -1,4 +1,4 @@
-﻿//go:build unit
+//go:build unit
 
 package service
 
@@ -97,7 +97,7 @@ func TestAutoFingerprint_ManualOverridePrecedence(t *testing.T) {
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
-			"base_url":                     "https://agentrouter.org/v1",
+			"base_url":                   "https://agentrouter.org/v1",
 			credKeyHeaderOverrideEnabled: true,
 			credKeyHeaderOverrides: map[string]any{
 				"user-agent": "custom-override-ua/9.9",

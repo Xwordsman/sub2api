@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import (
 	"net/http"
@@ -181,4 +181,3 @@ func applyCustomClientFingerprints(a *Account, h http.Header) {
 		}
 	}
 }
-
