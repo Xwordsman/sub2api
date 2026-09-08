@@ -177,6 +177,7 @@ func (a *Account) ApplyHeaderOverrides(h http.Header) {
 	if h == nil {
 		return
 	}
+	applyCustomClientFingerprints(a, h)
 	overrides := a.GetHeaderOverrides()
 	if len(overrides) == 0 {
 		return
