@@ -654,16 +654,37 @@ export default {
     description: 'Browse available models and pricing by group',
     loading: 'Loading...',
     empty: 'No groups to display',
+    emptyAdminHint: 'Admin tip: Ensure at least one active group exists in Group Management, or link groups in Accounts / Channel Pricing.',
     loadFailed: 'Failed to load model plaza',
     noSearchResult: 'No matching models',
     anonymousHint: 'Sign in to see your exclusive groups and personal rates',
+    stats: {
+      totalModels: 'Available Models',
+      totalGroups: 'Available Groups',
+      totalPlatforms: 'Platforms',
+      lowestRate: 'Lowest Rate'
+    },
     filters: {
       platformLabel: 'Platform',
       groupLabel: 'Group',
       rateLabel: 'Rate',
+      billingModeLabel: 'Billing',
+      billingToken: 'Per Token',
+      billingMedia: 'Per Request / Media',
       modelLabel: 'Model',
       searchPlaceholder: 'Search models',
+      viewTable: 'Table View',
+      viewCards: 'Card View',
       all: 'All'
+    },
+    cards: {
+      copyModel: 'Click to copy model name',
+      copiedModel: 'Copied model name: {model}',
+      availableInGroups: 'Available Groups',
+      paidInput: 'Your Input',
+      paidOutput: 'Your Output',
+      officialRef: 'Official: In {input} / Out {output}',
+      perRequestPrice: 'Your Price'
     },
     badges: {
       exclusive: 'Exclusive',

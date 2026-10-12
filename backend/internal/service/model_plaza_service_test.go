@@ -509,3 +509,76 @@ func TestListGroups_TimePricingPassthrough(t *testing.T) {
 	// 展示单价为标准时段价
 	require.InDelta(t, 0.28e-6, *m.Pricing.InputPrice, 1e-15)
 }
+
+type stubPlazaAccountReader struct {
+	byGroup map[int64][]Account
+}
+
+func (s *stubPlazaAccountReader) ListByGroup(_ context.Context, groupID int64) ([]Account, error) {
+	if s == nil || s.byGroup == nil {
+		return nil, nil
+	}
+	return s.byGroup[groupID], nil
+}
+
+func TestListGroups_FallbackToGroupAccountsAndAllowlistWhenNoChannels(t *testing.T) {
+	groups := []Group{
+		{
+			ID: 10, Name: "openai-mapped", Platform: PlatformOpenAI, RateMultiplier: 0.8,
+			ModelAllowlist: GroupModelAllowlist{
+				Enabled: true,
+				Models:  []string{"gpt-5.4", "custom-gpt-alias"},
+			},
+		},
+		{
+			ID: 20, Name: "empty-unused", Platform: PlatformAnthropic, RateMultiplier: 1.0,
+		},
+	}
+	svc := newPlazaServiceWithBilling(nil, groups, map[int64]string{10: PlatformOpenAI, 20: PlatformAnthropic},
+		newStubPricingServiceFromJSON(t, openAILadderCatalogJSON))
+	svc.SetAccountRepository(&stubPlazaAccountReader{
+		byGroup: map[int64][]Account{
+			10: {{
+				ID:          101,
+				Platform:    PlatformOpenAI,
+				Status:      StatusActive,
+				Schedulable: true,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{
+						"gpt-5.4":          "gpt-5.4",
+						"custom-gpt-alias": "gpt-5.4",
+						"blocked-model":    "gpt-5.4",
+					},
+				},
+			}},
+		},
+	})
+
+	out, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, out, 1, "已绑定账号的分组自动推导模型，无账号且无配置的空分组跳过")
+	require.Equal(t, int64(10), out[0].ID)
+	byName := plazaModelsByName(out[0].Models)
+	require.Contains(t, byName, "gpt-5.4")
+	require.Contains(t, byName, "custom-gpt-alias")
+	require.NotContains(t, byName, "blocked-model", "受分组模型白名单过滤")
+	require.NotNil(t, byName["gpt-5.4"].Pricing)
+	require.InDelta(t, 2.5e-6, *byName["gpt-5.4"].Pricing.InputPrice, 1e-15)
+	require.NotNil(t, byName["gpt-5.4"].OfficialPricing)
+}
+
+func TestListGroups_FallbackToPlatformDefaultsWhenSiteHasNoChannelsOrBoundAccounts(t *testing.T) {
+	groups := []Group{
+		{ID: 10, Name: "default-claude", Platform: PlatformAnthropic, RateMultiplier: 1.0},
+	}
+	svc := newPlazaServiceWithBilling(nil, groups, map[int64]string{10: PlatformAnthropic}, nil)
+	svc.SetAccountRepository(&stubPlazaAccountReader{})
+
+	out, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, out, 1, "全站无渠道且未绑定分组账号时，兜底展示活跃分组的平台默认模型")
+	require.NotEmpty(t, out[0].Models)
+	for _, m := range out[0].Models {
+		require.Equal(t, PlatformAnthropic, m.Platform)
+	}
+}

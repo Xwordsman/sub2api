@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
@@ -60,13 +62,20 @@ type PlazaGroup struct {
 	Models                    []PlazaModel
 }
 
+// PlazaAccountReader 为模型广场提供按分组读取活跃账号的能力（AccountRepository 的窄接口子集）。
+type PlazaAccountReader interface {
+	ListByGroup(ctx context.Context, groupID int64) ([]Account, error)
+}
+
 // ModelPlazaService 聚合模型广场数据。
 //
-// 模型枚举来自渠道配置；token 模型的展示单价与阶梯由 BillingService 的阶梯表
+// 模型枚举优先来自渠道配置；当分组未关联任何渠道定价时，自动从分组关联账号、
+// 分组白名单、分组定价及平台默认模型推导可用模型。token 模型的展示单价与阶梯由 BillingService 的阶梯表
 // 查询给出（与扣费走同一条解析链与计费函数），图片/按次模型沿用渠道/分组档位价。
 type ModelPlazaService struct {
 	channelRepo    ChannelRepository
 	groupRepo      GroupRepository
+	accountRepo    PlazaAccountReader
 	pricingService *PricingService
 	billingService *BillingService
 	resolver       *ModelPricingResolver
@@ -87,6 +96,11 @@ func NewModelPlazaService(
 		billingService: billingService,
 		resolver:       resolver,
 	}
+}
+
+// SetAccountRepository 注入账号仓储，用于在分组未配置渠道定价时按关联账号/分组配置自动推导模型。
+func (s *ModelPlazaService) SetAccountRepository(accountRepo PlazaAccountReader) {
+	s.accountRepo = accountRepo
 }
 
 // ListGroups 返回模型广场数据：每个活跃分组附带其可用模型与定价。
@@ -149,6 +163,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	}
 	// modelIdx[groupID][platform+modelName] = index into byGroup[groupID].Models
 	modelIdx := make(map[int64]map[modelKey]int, len(groups))
+	hasChannelModels := false
 	for i := range channels {
 		ch := &channels[i]
 		if ch.Status != StatusActive {
@@ -191,7 +206,42 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 					Platform: m.Platform,
 					Pricing:  m.Pricing,
 				})
+				hasChannelModels = true
 			}
+		}
+	}
+
+	// 对未关联渠道定价的分组，尝试从分组自身配置（分组价卡、模型白名单）与分组下活跃账号推导模型。
+	hasAnyGroupModels := hasChannelModels
+	for _, gid := range order {
+		pg := byGroup[gid]
+		if len(pg.Models) > 0 {
+			hasAnyGroupModels = true
+			continue
+		}
+		g := groupEnt[gid]
+		var groupAccounts []Account
+		if s.accountRepo != nil {
+			if accs, accErr := s.accountRepo.ListByGroup(ctx, gid); accErr == nil {
+				groupAccounts = accs
+			}
+		}
+		if len(groupAccounts) == 0 && !g.ModelAllowlistEnabled() && len(g.ModelPricing) == 0 {
+			continue
+		}
+		s.appendFallbackGroupModels(pg, g, groupAccounts, false)
+		if len(pg.Models) > 0 {
+			hasAnyGroupModels = true
+		}
+	}
+
+	// 若全站既未配置渠道定价、分组下也暂未绑定账号（例如刚初始化或仅使用未分组账号），
+	// 为活跃分组按所属平台默认模型兜底展示，避免开启模型广场后完全空白。
+	if !hasAnyGroupModels && s.accountRepo != nil {
+		for _, gid := range order {
+			pg := byGroup[gid]
+			g := groupEnt[gid]
+			s.appendFallbackGroupModels(pg, g, nil, true)
 		}
 	}
 
@@ -212,6 +262,9 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		for j := range pg.Models {
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
 			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
+			if pricingNeedsFallback(pg.Models[j].Pricing) && pg.Models[j].OfficialPricing != nil {
+				pg.Models[j].Pricing = synthesizePricingFromOfficial(pg.Models[j].OfficialPricing, pg.Models[j].Pricing)
+			}
 		}
 		out = append(out, *pg)
 	}
@@ -223,6 +276,214 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
+}
+
+// appendFallbackGroupModels 在分组未配置渠道定价时，根据分组关联账号、分组白名单、
+// 分组定价及平台默认模型列表填充分组模型。
+func (s *ModelPlazaService) appendFallbackGroupModels(
+	pg *PlazaGroup,
+	g *Group,
+	accounts []Account,
+	forcePlatformDefaults bool,
+) {
+	if pg == nil || g == nil {
+		return
+	}
+
+	// 优先使用可调度账号；若分组内活跃账号均暂时不可调度，仍用活跃账号推导橱窗模型。
+	activeAccounts := filterPlazaActiveAccounts(accounts)
+	platforms := resolvePlazaFallbackPlatforms(g, activeAccounts, forcePlatformDefaults)
+	if len(platforms) == 0 {
+		return
+	}
+
+	supported := make([]SupportedModel, 0)
+	for _, platform := range platforms {
+		models := collectPlazaPlatformModels(g, platform, activeAccounts, forcePlatformDefaults)
+		for _, modelName := range models {
+			supported = append(supported, SupportedModel{
+				Name:     modelName,
+				Platform: platform,
+				Pricing:  matchGroupModelPricing(g, modelName),
+			})
+		}
+	}
+	if len(supported) == 0 {
+		return
+	}
+
+	fillGlobalPricingFallback(s.pricingService, supported)
+	for i := range supported {
+		pg.Models = append(pg.Models, PlazaModel{
+			Name:     supported[i].Name,
+			Platform: supported[i].Platform,
+			Pricing:  supported[i].Pricing,
+		})
+	}
+}
+
+func filterPlazaActiveAccounts(accounts []Account) []Account {
+	if len(accounts) == 0 {
+		return nil
+	}
+	schedulable := make([]Account, 0, len(accounts))
+	for i := range accounts {
+		if accounts[i].Schedulable {
+			schedulable = append(schedulable, accounts[i])
+		}
+	}
+	if len(schedulable) > 0 {
+		return schedulable
+	}
+	return accounts
+}
+
+func resolvePlazaFallbackPlatforms(g *Group, accounts []Account, forcePlatformDefaults bool) []string {
+	if g.Platform != PlatformComposite {
+		p := strings.TrimSpace(g.Platform)
+		if p == "" {
+			p = PlatformAnthropic
+		}
+		return []string{p}
+	}
+
+	seen := make(map[string]struct{})
+	platforms := make([]string, 0)
+	addPlatform := func(p string) {
+		p = strings.TrimSpace(p)
+		if !isConcreteRequestPlatform(p) {
+			return
+		}
+		if _, ok := seen[p]; ok {
+			return
+		}
+		seen[p] = struct{}{}
+		platforms = append(platforms, p)
+	}
+	for i := range accounts {
+		addPlatform(accounts[i].Platform)
+	}
+	for i := range g.ModelPricing {
+		addPlatform(g.ModelPricing[i].Platform)
+	}
+	if len(platforms) == 0 && (forcePlatformDefaults || g.ModelAllowlistEnabled()) {
+		for _, p := range domain.CompositePrecedencePlatformIDs() {
+			if p == PlatformTypeSafe {
+				continue
+			}
+			addPlatform(p)
+		}
+	}
+	sort.Strings(platforms)
+	return platforms
+}
+
+func collectPlazaPlatformModels(
+	g *Group,
+	platform string,
+	accounts []Account,
+	forcePlatformDefaults bool,
+) []string {
+	matching := make([]Account, 0, len(accounts))
+	for i := range accounts {
+		acc := &accounts[i]
+		if acc.Platform == platform || mixedListingAccountAllowed(platform, acc) {
+			matching = append(matching, *acc)
+		}
+	}
+
+	seen := make(map[string]struct{})
+	candidates := make([]string, 0)
+	addCandidate := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || strings.Contains(name, "*") {
+			return
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, name)
+	}
+
+	for i := range g.ModelPricing {
+		mp := &g.ModelPricing[i]
+		if mp.Platform != "" && mp.Platform != platform {
+			continue
+		}
+		for _, m := range mp.Models {
+			addCandidate(m)
+		}
+	}
+
+	needsPlatformDefaults := forcePlatformDefaults || len(matching) == 0
+	for i := range matching {
+		acc := &matching[i]
+		mapping := acc.GetModelMapping()
+		unmappedOrPassthrough := len(mapping) == 0 || (platform == PlatformOpenAI && acc.IsOpenAIPassthroughEnabled())
+		if unmappedOrPassthrough {
+			needsPlatformDefaults = true
+		}
+		for model := range mapping {
+			trimmed := strings.TrimSpace(model)
+			if trimmed == "*" {
+				needsPlatformDefaults = true
+				continue
+			}
+			if acc.Platform != platform && !mixedListingModelAllowed(platform, trimmed) {
+				continue
+			}
+			addCandidate(trimmed)
+		}
+		if unmappedOrPassthrough {
+			if snap := acc.GetUpstreamModelMetadataSnapshot(); snap != nil {
+				for modelID := range snap.Models {
+					if acc.Platform != platform && !mixedListingModelAllowed(platform, modelID) {
+						continue
+					}
+					addCandidate(modelID)
+				}
+			}
+		}
+	}
+
+	if needsPlatformDefaults || len(candidates) == 0 {
+		for _, modelID := range defaultModelsListCandidateIDs(platform) {
+			addCandidate(modelID)
+		}
+	}
+
+	if g.ModelAllowlistEnabled() {
+		if g.Platform != PlatformComposite {
+			for _, entry := range g.ModelAllowlist.Models {
+				addCandidate(entry)
+			}
+		}
+		candidates = g.ModelAllowlist.FilterForListing(candidates)
+	}
+	return candidates
+}
+
+func synthesizePricingFromOfficial(official *PlazaOfficialPricing, existing *ChannelModelPricing) *ChannelModelPricing {
+	if official == nil {
+		return existing
+	}
+	out := &ChannelModelPricing{
+		BillingMode:       BillingModeToken,
+		InputPrice:        official.InputPrice,
+		OutputPrice:       official.OutputPrice,
+		CacheWritePrice:   official.CacheWritePrice,
+		CacheWrite1hPrice: official.CacheWrite1hPrice,
+		CacheReadPrice:    official.CacheReadPrice,
+	}
+	if existing != nil {
+		out.ReasoningEffortMultipliers = reasoningEffortMultipliersFromPricing(existing)
+	}
+	if len(official.Intervals) > 0 {
+		out.Intervals = append([]PricingInterval(nil), official.Intervals...)
+	}
+	return out
 }
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：

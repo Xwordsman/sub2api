@@ -65,7 +65,24 @@
           <!-- 模型名 + 非 token 计费模式徽章;分时时段行额外标注时段 -->
           <td class="border-r border-gray-100 py-2.5 pl-5 pr-4 align-middle dark:border-dark-700/60">
             <div class="flex flex-wrap items-center gap-1.5">
-              <span class="font-medium text-gray-900 dark:text-white">{{ m.name }}</span>
+              <button
+                type="button"
+                class="group/copy inline-flex items-center gap-1 text-left font-medium text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
+                :title="t('modelPlaza.cards.copyModel')"
+                @click="copyModelName(m.name, key)"
+              >
+                <span>{{ m.name }}</span>
+                <Icon
+                  :name="copiedKey === key ? 'check' : 'copy'"
+                  size="xs"
+                  class="h-3.5 w-3.5 shrink-0 transition-opacity"
+                  :class="
+                    copiedKey === key
+                      ? 'text-emerald-500 opacity-100'
+                      : 'text-gray-400 opacity-0 group-hover/copy:opacity-100 dark:text-dark-400'
+                  "
+                />
+              </button>
               <!-- 时段徽章紧跟模型名,其余徽章排在后面,空间不足时先换行的是它们 -->
               <span
                 v-if="period"
@@ -306,8 +323,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Icon from '@/components/icons/Icon.vue'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import {
@@ -319,6 +337,7 @@ import {
 } from '@/constants/channel'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
 import type { UserPricingInterval } from '@/api/channels'
+import { useAppStore } from '@/stores/app'
 
 function reasoningEffortMultipliers(model: PlazaModel): [string, number][] {
   const multipliers = model.pricing?.reasoning_effort_multipliers
@@ -354,6 +373,46 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const copiedKey = ref<string | null>(null)
+
+async function copyModelName(name: string, rowKey: string) {
+  if (!name) return
+  let ok = false
+  if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(name)
+      ok = true
+    } catch {
+      ok = false
+    }
+  }
+  if (!ok && typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea')
+    textarea.value = name
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      ok = document.execCommand('copy')
+    } catch {
+      ok = false
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
+  if (ok) {
+    copiedKey.value = rowKey
+    setTimeout(() => {
+      if (copiedKey.value === rowKey) copiedKey.value = null
+    }, 1800)
+    try {
+      useAppStore().showSuccess(t('modelPlaza.cards.copiedModel', { model: name }))
+    } catch {
+      // 单测环境无 Pinia 时静默忽略
+    }
+  }
+}
 
 /** 实付分区只从平台拿一个主色,浅底/标题/下划线全部由 scoped CSS 用 color-mix 派生。 */
 const accentStyle = computed(() => ({ '--plaza-accent': platformAccentColor(props.platform ?? '') }))

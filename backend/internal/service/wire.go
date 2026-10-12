@@ -965,7 +965,7 @@ var ProviderSet = wire.NewSet(
 	NewChannelService,
 	wire.Bind(new(ChannelCacheInvalidator), new(*ChannelService)),
 	NewModelPricingResolver,
-	NewModelPlazaService,
+	ProvideModelPlazaService,
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
@@ -985,6 +985,20 @@ var ProviderSet = wire.NewSet(
 func ProvideUserPlatformQuotaUsageFlusher(cfg *config.Config, cache BillingCache, quotaRepo UserPlatformQuotaRepository, tw *TimingWheelService) *UserPlatformQuotaUsageFlusher {
 	svc := NewUserPlatformQuotaUsageFlusher(cfg, cache, quotaRepo, tw)
 	svc.Start()
+	return svc
+}
+
+// ProvideModelPlazaService 创建模型广场服务并注入账号仓储，支持无渠道配置时从分组账号推导模型。
+func ProvideModelPlazaService(
+	channelRepo ChannelRepository,
+	groupRepo GroupRepository,
+	accountRepo AccountRepository,
+	pricingService *PricingService,
+	billingService *BillingService,
+	resolver *ModelPricingResolver,
+) *ModelPlazaService {
+	svc := NewModelPlazaService(channelRepo, groupRepo, pricingService, billingService, resolver)
+	svc.SetAccountRepository(accountRepo)
 	return svc
 }
 

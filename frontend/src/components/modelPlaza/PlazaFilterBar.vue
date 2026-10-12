@@ -80,30 +80,83 @@
     </div>
 
     <!-- 四级:模型名搜索(纯前端过滤) -->
-    <div class="flex flex-wrap items-start gap-2">
-      <span class="w-10 shrink-0 pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">
-        {{ t('modelPlaza.filters.modelLabel') }}
-      </span>
-      <div class="relative w-full sm:w-72">
-        <Icon
-          name="search"
-          size="sm"
-          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500"
-        />
-        <input
-          :value="search"
-          type="text"
-          :placeholder="t('modelPlaza.filters.searchPlaceholder')"
-          class="input rounded-lg py-1.5 pl-9 pr-9"
-          @input="$emit('update:search', ($event.target as HTMLInputElement).value)"
-        />
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-start gap-2">
+        <span class="w-10 shrink-0 pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">
+          {{ t('modelPlaza.filters.billingModeLabel') }}
+        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-for="bm in billingModeOptions"
+            :key="`billing-${bm.value}`"
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+            :class="chipClass(billingMode === bm.value)"
+            @click="$emit('update:billingMode', bm.value)"
+          >
+            {{ bm.label }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 五级:模型名搜索 + 视图切换 -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-1 flex-wrap items-start gap-2">
+        <span class="w-10 shrink-0 pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">
+          {{ t('modelPlaza.filters.modelLabel') }}
+        </span>
+        <div class="relative w-full sm:w-72">
+          <Icon
+            name="search"
+            size="sm"
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500"
+          />
+          <input
+            :value="search"
+            type="text"
+            :placeholder="t('modelPlaza.filters.searchPlaceholder')"
+            class="input rounded-lg py-1.5 pl-9 pr-9"
+            @input="$emit('update:search', ($event.target as HTMLInputElement).value)"
+          />
+          <button
+            v-if="search"
+            type="button"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600 dark:text-dark-500 dark:hover:text-gray-300"
+            @click="$emit('update:search', '')"
+          >
+            <Icon name="x" size="xs" class="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 视图模式切换:分组表格 / 模型卡片 -->
+      <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white p-0.5 dark:border-dark-700 dark:bg-dark-800/60">
         <button
-          v-if="search"
           type="button"
-          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600 dark:text-dark-500 dark:hover:text-gray-300"
-          @click="$emit('update:search', '')"
+          class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition"
+          :class="
+            viewMode === 'table'
+              ? 'bg-primary-500 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 dark:text-dark-300 dark:hover:text-white'
+          "
+          @click="$emit('update:viewMode', 'table')"
         >
-          <Icon name="x" size="xs" class="h-3.5 w-3.5" />
+          <Icon name="menu" size="xs" class="h-3.5 w-3.5" />
+          {{ t('modelPlaza.filters.viewTable') }}
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition"
+          :class="
+            viewMode === 'cards'
+              ? 'bg-primary-500 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 dark:text-dark-300 dark:hover:text-white'
+          "
+          @click="$emit('update:viewMode', 'cards')"
+        >
+          <Icon name="grid" size="xs" class="h-3.5 w-3.5" />
+          {{ t('modelPlaza.filters.viewCards') }}
         </button>
       </div>
     </div>
@@ -111,13 +164,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformAccentColor } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
 
-const props = defineProps<{
+export type PlazaBillingFilter = 'all' | 'token' | 'media'
+export type PlazaViewMode = 'table' | 'cards'
+
+const props = withDefaults(defineProps<{
   /** 数据中出现的平台(去重排序后)。 */
   platforms: string[]
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
@@ -127,18 +184,31 @@ const props = defineProps<{
   platform: string
   groupId: number | 'all'
   rate: number | 'all'
+  billingMode?: PlazaBillingFilter
+  viewMode?: PlazaViewMode
   /** 模型名搜索词(纯前端过滤)。 */
   search: string
-}>()
+}>(), {
+  billingMode: 'all',
+  viewMode: 'table'
+})
 
 defineEmits<{
   'update:platform': [value: string]
   'update:groupId': [value: number | 'all']
   'update:rate': [value: number | 'all']
+  'update:billingMode': [value: PlazaBillingFilter]
+  'update:viewMode': [value: PlazaViewMode]
   'update:search': [value: string]
 }>()
 
 const { t } = useI18n()
+
+const billingModeOptions = computed<Array<{ value: PlazaBillingFilter; label: string }>>(() => [
+  { value: 'all', label: t('modelPlaza.filters.all') },
+  { value: 'token', label: t('modelPlaza.filters.billingToken') },
+  { value: 'media', label: t('modelPlaza.filters.billingMedia') }
+])
 
 /**
  * 三个维度互为约束(faceted):某选项可点 ⟺ 在「其他两维」当前选择下仍有分组命中。

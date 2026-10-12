@@ -659,16 +659,37 @@ export default {
     description: '按分组浏览可用模型与价格',
     loading: '加载中...',
     empty: '暂无可展示的分组',
+    emptyAdminHint: '管理员提示：请确保在「分组管理」中至少有一个启用状态的分组，或在「账号管理 / 渠道定价」中关联分组。',
     loadFailed: '加载模型广场失败',
     noSearchResult: '没有匹配的模型',
     anonymousHint: '登录后可查看你的专属分组与专属倍率',
+    stats: {
+      totalModels: '可用模型',
+      totalGroups: '可用分组',
+      totalPlatforms: '接入平台',
+      lowestRate: '最低倍率'
+    },
     filters: {
       platformLabel: '平台',
       groupLabel: '分组',
       rateLabel: '倍率',
+      billingModeLabel: '计费',
+      billingToken: '按量 (Token)',
+      billingMedia: '按次 / 媒体',
       modelLabel: '模型',
       searchPlaceholder: '搜索模型名称',
+      viewTable: '分组表格',
+      viewCards: '模型卡片',
       all: '全部'
+    },
+    cards: {
+      copyModel: '点击复制模型名称',
+      copiedModel: '已复制模型名称: {model}',
+      availableInGroups: '可用分组',
+      paidInput: '实付输入',
+      paidOutput: '实付输出',
+      officialRef: '官方参考: 入 {input} / 出 {output}',
+      perRequestPrice: '实付单价'
     },
     badges: {
       exclusive: '专属分组',
