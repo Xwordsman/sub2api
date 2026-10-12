@@ -232,6 +232,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		OIDCConnectValidateIDToken:                             settings.OIDCConnectValidateIDToken,
 		OIDCConnectAllowedSigningAlgs:                          settings.OIDCConnectAllowedSigningAlgs,
 		OIDCConnectClockSkewSeconds:                            settings.OIDCConnectClockSkewSeconds,
+		OIDCConnectBypassRegistration:                          settings.OIDCConnectBypassRegistration,
 		OIDCConnectRequireEmailVerified:                        settings.OIDCConnectRequireEmailVerified,
 		OIDCConnectUserInfoEmailPath:                           settings.OIDCConnectUserInfoEmailPath,
 		OIDCConnectUserInfoIDPath:                              settings.OIDCConnectUserInfoIDPath,

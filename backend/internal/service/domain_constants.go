@@ -355,6 +355,7 @@ const (
 	SettingKeyOIDCConnectValidateIDToken      = "oidc_connect_validate_id_token"
 	SettingKeyOIDCConnectAllowedSigningAlgs   = "oidc_connect_allowed_signing_algs"
 	SettingKeyOIDCConnectClockSkewSeconds     = "oidc_connect_clock_skew_seconds"
+	SettingKeyOIDCConnectBypassRegistration   = "oidc_connect_bypass_registration"
 	SettingKeyOIDCConnectRequireEmailVerified = "oidc_connect_require_email_verified"
 	SettingKeyOIDCConnectUserInfoEmailPath    = "oidc_connect_userinfo_email_path"
 	SettingKeyOIDCConnectUserInfoIDPath       = "oidc_connect_userinfo_id_path"

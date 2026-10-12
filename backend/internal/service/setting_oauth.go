@@ -768,6 +768,7 @@ func (s *SettingService) GetOIDCConnectOAuthConfig(ctx context.Context) (config.
 		SettingKeyOIDCConnectValidateIDToken,
 		SettingKeyOIDCConnectAllowedSigningAlgs,
 		SettingKeyOIDCConnectClockSkewSeconds,
+		SettingKeyOIDCConnectBypassRegistration,
 		SettingKeyOIDCConnectRequireEmailVerified,
 		SettingKeyOIDCConnectUserInfoEmailPath,
 		SettingKeyOIDCConnectUserInfoIDPath,
@@ -832,6 +833,9 @@ func (s *SettingService) GetOIDCConnectOAuthConfig(ctx context.Context) (config.
 	}
 	if v, ok := settings[SettingKeyOIDCConnectAllowedSigningAlgs]; ok && strings.TrimSpace(v) != "" {
 		effective.AllowedSigningAlgs = strings.TrimSpace(v)
+	}
+	if raw, ok := settings[SettingKeyOIDCConnectBypassRegistration]; ok {
+		effective.BypassRegistration = raw == "true"
 	}
 	if raw, ok := settings[SettingKeyOIDCConnectClockSkewSeconds]; ok && strings.TrimSpace(raw) != "" {
 		if parsed, parseErr := strconv.Atoi(strings.TrimSpace(raw)); parseErr == nil {

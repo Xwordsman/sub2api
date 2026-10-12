@@ -136,6 +136,7 @@ type UpdateSettingsRequest struct {
 	OIDCConnectValidateIDToken      *bool  `json:"oidc_connect_validate_id_token"`
 	OIDCConnectAllowedSigningAlgs   string `json:"oidc_connect_allowed_signing_algs"`
 	OIDCConnectClockSkewSeconds     int    `json:"oidc_connect_clock_skew_seconds"`
+	OIDCConnectBypassRegistration   bool   `json:"oidc_connect_bypass_registration"`
 	OIDCConnectRequireEmailVerified bool   `json:"oidc_connect_require_email_verified"`
 	OIDCConnectUserInfoEmailPath    string `json:"oidc_connect_userinfo_email_path"`
 	OIDCConnectUserInfoIDPath       string `json:"oidc_connect_userinfo_id_path"`
@@ -1626,6 +1627,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		OIDCConnectValidateIDToken:             oidcValidateIDToken,
 		OIDCConnectAllowedSigningAlgs:          req.OIDCConnectAllowedSigningAlgs,
 		OIDCConnectClockSkewSeconds:            req.OIDCConnectClockSkewSeconds,
+		OIDCConnectBypassRegistration:          req.OIDCConnectBypassRegistration,
 		OIDCConnectRequireEmailVerified:        req.OIDCConnectRequireEmailVerified,
 		OIDCConnectUserInfoEmailPath:           req.OIDCConnectUserInfoEmailPath,
 		OIDCConnectUserInfoIDPath:              req.OIDCConnectUserInfoIDPath,
@@ -2290,6 +2292,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		OIDCConnectValidateIDToken:                             updatedSettings.OIDCConnectValidateIDToken,
 		OIDCConnectAllowedSigningAlgs:                          updatedSettings.OIDCConnectAllowedSigningAlgs,
 		OIDCConnectClockSkewSeconds:                            updatedSettings.OIDCConnectClockSkewSeconds,
+		OIDCConnectBypassRegistration:                          updatedSettings.OIDCConnectBypassRegistration,
 		OIDCConnectRequireEmailVerified:                        updatedSettings.OIDCConnectRequireEmailVerified,
 		OIDCConnectUserInfoEmailPath:                           updatedSettings.OIDCConnectUserInfoEmailPath,
 		OIDCConnectUserInfoIDPath:                              updatedSettings.OIDCConnectUserInfoIDPath,

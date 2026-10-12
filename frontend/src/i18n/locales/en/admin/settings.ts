@@ -395,6 +395,7 @@ export default {
         allowedSigningAlgsPlaceholder: 'RS256,ES256,PS256',
         usePkce: 'Use PKCE',
         validateIdToken: 'Validate ID Token',
+        bypassRegistration: 'Allow New User Registration',
         requireEmailVerified: 'Require Email Verified',
         userinfoEmailPath: 'UserInfo Email Path',
         userinfoEmailPathPlaceholder: 'for example data.email',

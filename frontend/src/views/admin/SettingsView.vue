@@ -3724,7 +3724,7 @@
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   <div
                     class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
                   >
@@ -3750,6 +3750,20 @@
                     <Toggle
                       v-model="form.oidc_connect_validate_id_token"
                       data-testid="oidc-connect-validate-id-token"
+                    />
+                  </div>
+
+                  <div
+                    class="flex items-center justify-between rounded border border-gray-200 px-4 py-3 dark:border-dark-700"
+                  >
+                    <div>
+                      <label class="font-medium text-gray-900 dark:text-white">
+                        {{ t("admin.settings.oidc.bypassRegistration") }}
+                      </label>
+                    </div>
+                    <Toggle
+                      v-model="form.oidc_connect_bypass_registration"
+                      data-testid="oidc-connect-bypass-registration"
                     />
                   </div>
 
@@ -9956,6 +9970,7 @@ const form = reactive<SettingsForm>({
   oidc_connect_token_auth_method: "client_secret_post",
   oidc_connect_use_pkce: false,
   oidc_connect_validate_id_token: false,
+  oidc_connect_bypass_registration: false,
   oidc_connect_allowed_signing_algs: "RS256,ES256,PS256",
   oidc_connect_clock_skew_seconds: 120,
   oidc_connect_require_email_verified: false,
@@ -11621,6 +11636,7 @@ async function saveSettings() {
       oidc_connect_token_auth_method: form.oidc_connect_token_auth_method,
       oidc_connect_use_pkce: form.oidc_connect_use_pkce,
       oidc_connect_validate_id_token: form.oidc_connect_validate_id_token,
+      oidc_connect_bypass_registration: form.oidc_connect_bypass_registration,
       oidc_connect_allowed_signing_algs: form.oidc_connect_allowed_signing_algs,
       oidc_connect_clock_skew_seconds: form.oidc_connect_clock_skew_seconds,
       oidc_connect_require_email_verified:

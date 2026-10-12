@@ -119,6 +119,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyOIDCConnectValidateIDToken:                strconv.FormatBool(oidcValidateIDTokenDefault),
 		SettingKeyOIDCConnectAllowedSigningAlgs:             "RS256,ES256,PS256",
 		SettingKeyOIDCConnectClockSkewSeconds:               "120",
+		SettingKeyOIDCConnectBypassRegistration:             "false",
 		SettingKeyOIDCConnectRequireEmailVerified:           "false",
 		SettingKeyOIDCConnectUserInfoEmailPath:              "",
 		SettingKeyOIDCConnectUserInfoIDPath:                 "",
@@ -700,6 +701,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	if !clockSkewSet && result.OIDCConnectClockSkewSeconds == 0 {
 		result.OIDCConnectClockSkewSeconds = 120
+	}
+	if raw, ok := settings[SettingKeyOIDCConnectBypassRegistration]; ok {
+		result.OIDCConnectBypassRegistration = raw == "true"
+	} else {
+		result.OIDCConnectBypassRegistration = oidcBase.BypassRegistration
 	}
 	if raw, ok := settings[SettingKeyOIDCConnectRequireEmailVerified]; ok {
 		result.OIDCConnectRequireEmailVerified = raw == "true"

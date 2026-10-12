@@ -922,9 +922,27 @@ func newAuthServiceWithDingTalkCfg(settings map[string]string, dtCfg config.Ding
 		JWT:      config.JWTConfig{Secret: "test-secret", ExpireHour: 1},
 		Default:  config.DefaultConfig{UserBalance: 3.5, UserConcurrency: 2},
 		DingTalk: dtCfg,
+		OIDC:     minOIDCURLs(),
 	}
 	settingService := NewSettingService(&settingRepoStub{values: settings}, cfg)
 	return NewAuthService(nil, nil, nil, nil, cfg, settingService, nil, nil, nil, nil, nil, nil, nil)
+}
+
+func minOIDCURLs() config.OIDCConnectConfig {
+	return config.OIDCConnectConfig{
+		ClientID:            "test-client",
+		ClientSecret:        "test-secret",
+		IssuerURL:           "https://example.com",
+		AuthorizeURL:        "https://example.com/oauth2/auth",
+		TokenURL:            "https://example.com/oauth2/token",
+		UserInfoURL:         "https://example.com/oauth2/userinfo",
+		JWKSURL:             "https://example.com/oauth2/jwks",
+		RedirectURL:         "https://example.com/callback",
+		FrontendRedirectURL: "/auth/callback",
+		Scopes:              "openid profile email",
+		AllowedSigningAlgs:  "RS256",
+		TokenAuthMethod:     "client_secret_post",
+	}
 }
 
 // minDingTalkURLs 返回一个包含必填字段的基础 DingTalkConnectConfig（不设 Enabled/BypassRegistration/Policy）。
@@ -997,6 +1015,36 @@ func TestCanBypassRegistrationDisabledForOAuth(t *testing.T) {
 				SettingKeyDingTalkConnectEnabled:               "true",
 				SettingKeyDingTalkConnectBypassRegistration:    "true",
 				SettingKeyDingTalkConnectCorpRestrictionPolicy: "internal_only",
+			},
+			dtCfg: minDingTalkURLs(),
+			want:  true,
+		},
+		{
+			name:         "oidc but cfg.Enabled=false → false",
+			signupSource: "oidc",
+			settings: map[string]string{
+				SettingKeyOIDCConnectEnabled:            "false",
+				SettingKeyOIDCConnectBypassRegistration: "true",
+			},
+			dtCfg: minDingTalkURLs(),
+			want:  false,
+		},
+		{
+			name:         "oidc enabled but bypass=false → false",
+			signupSource: "oidc",
+			settings: map[string]string{
+				SettingKeyOIDCConnectEnabled:            "true",
+				SettingKeyOIDCConnectBypassRegistration: "false",
+			},
+			dtCfg: minDingTalkURLs(),
+			want:  false,
+		},
+		{
+			name:         "oidc enabled + bypass=true → true",
+			signupSource: "oidc",
+			settings: map[string]string{
+				SettingKeyOIDCConnectEnabled:            "true",
+				SettingKeyOIDCConnectBypassRegistration: "true",
 			},
 			dtCfg: minDingTalkURLs(),
 			want:  true,

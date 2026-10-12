@@ -305,6 +305,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.OIDCConnectClockSkewSeconds != after.OIDCConnectClockSkewSeconds {
 		changed = append(changed, "oidc_connect_clock_skew_seconds")
 	}
+	if before.OIDCConnectBypassRegistration != after.OIDCConnectBypassRegistration {
+		changed = append(changed, "oidc_connect_bypass_registration")
+	}
 	if before.OIDCConnectRequireEmailVerified != after.OIDCConnectRequireEmailVerified {
 		changed = append(changed, "oidc_connect_require_email_verified")
 	}

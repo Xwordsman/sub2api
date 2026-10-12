@@ -664,16 +664,25 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, email, username 
 }
 
 // canBypassRegistrationDisabledForOAuth 在钉钉企业模式（internal_only）且
-// dingtalk_connect_bypass_registration=true 时，允许跳过全局 registration_enabled 检查。
+// dingtalk_connect_bypass_registration=true，或 OIDC 且
+// oidc_connect_bypass_registration=true 时，允许跳过全局 registration_enabled 检查。
 func (s *AuthService) canBypassRegistrationDisabledForOAuth(ctx context.Context, signupSource string) bool {
-	if signupSource != "dingtalk" {
-		return false
+	signupSource = normalizeOAuthSignupSource(signupSource)
+	if signupSource == "dingtalk" {
+		cfg, err := s.settingService.GetDingTalkConnectOAuthConfig(ctx)
+		if err != nil || !cfg.Enabled || !cfg.BypassRegistration {
+			return false
+		}
+		return cfg.CorpRestrictionPolicy == "internal_only"
 	}
-	cfg, err := s.settingService.GetDingTalkConnectOAuthConfig(ctx)
-	if err != nil || !cfg.Enabled || !cfg.BypassRegistration {
-		return false
+	if signupSource == "oidc" {
+		cfg, err := s.settingService.GetOIDCConnectOAuthConfig(ctx)
+		if err != nil || !cfg.Enabled || !cfg.BypassRegistration {
+			return false
+		}
+		return true
 	}
-	return cfg.CorpRestrictionPolicy == "internal_only"
+	return false
 }
 
 // LoginOrRegisterOAuthWithTokenPair 用于第三方 OAuth/SSO 登录，返回完整的 TokenPair。

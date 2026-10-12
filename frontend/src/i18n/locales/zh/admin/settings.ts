@@ -392,6 +392,7 @@ export default {
         allowedSigningAlgsPlaceholder: 'RS256,ES256,PS256',
         usePkce: '启用 PKCE',
         validateIdToken: '校验 ID Token',
+        bypassRegistration: '允许新用户注册（忽略全局开放注册）',
         requireEmailVerified: '要求邮箱已验证',
         userinfoEmailPath: 'UserInfo 邮箱字段路径',
         userinfoEmailPathPlaceholder: '例如 data.email',

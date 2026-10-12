@@ -360,6 +360,7 @@ type OIDCConnectConfig struct {
 	ValidateIDTokenExplicit bool   `mapstructure:"-" yaml:"-"`
 	AllowedSigningAlgs      string `mapstructure:"allowed_signing_algs"`   // 默认 "RS256,ES256,PS256"
 	ClockSkewSeconds        int    `mapstructure:"clock_skew_seconds"`     // 默认 120
+	BypassRegistration      bool   `mapstructure:"bypass_registration"`    // 允许通过 OIDC 自动注册（豁免全局开放注册限制）
 	RequireEmailVerified    bool   `mapstructure:"require_email_verified"` // 默认 false
 
 	// 可选：用于从 userinfo JSON 中提取字段的 gjson 路径。
@@ -2190,6 +2191,7 @@ func setDefaults() {
 	viper.SetDefault("oidc_connect.allowed_signing_algs", "RS256,ES256,PS256")
 	viper.SetDefault("oidc_connect.clock_skew_seconds", 120)
 	viper.SetDefault("oidc_connect.require_email_verified", false)
+	viper.SetDefault("oidc_connect.bypass_registration", false)
 	viper.SetDefault("oidc_connect.userinfo_email_path", "")
 	viper.SetDefault("oidc_connect.userinfo_id_path", "")
 	viper.SetDefault("oidc_connect.userinfo_username_path", "")

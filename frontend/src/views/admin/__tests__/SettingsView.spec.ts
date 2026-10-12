@@ -443,6 +443,7 @@ const baseSettingsResponse = {
   oidc_connect_token_auth_method: "client_secret_post",
   oidc_connect_use_pkce: true,
   oidc_connect_validate_id_token: true,
+  oidc_connect_bypass_registration: false,
   oidc_connect_allowed_signing_algs: "RS256,ES256,PS256",
   oidc_connect_clock_skew_seconds: 120,
   oidc_connect_require_email_verified: false,

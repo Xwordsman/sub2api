@@ -130,6 +130,7 @@ type SystemSettings struct {
 	OIDCConnectValidateIDToken        bool
 	OIDCConnectAllowedSigningAlgs     string
 	OIDCConnectClockSkewSeconds       int
+	OIDCConnectBypassRegistration     bool
 	OIDCConnectRequireEmailVerified   bool
 	OIDCConnectUserInfoEmailPath      string
 	OIDCConnectUserInfoIDPath         string
