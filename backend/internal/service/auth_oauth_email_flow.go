@@ -121,9 +121,11 @@ func (s *AuthService) RegisterOAuthEmailAccount(
 	if isReservedEmail(email) {
 		return nil, nil, ErrEmailReserved
 	}
-	if err := s.VerifyOAuthEmailCode(ctx, email, verifyCode); err != nil {
-		slog.Error("oauth email register: verify code failed", "email", email, "error", err.Error())
-		return nil, nil, err
+	if s.settingService != nil && s.settingService.IsEmailVerifyEnabled(ctx) {
+		if err := s.VerifyOAuthEmailCode(ctx, email, verifyCode); err != nil {
+			slog.Error("oauth email register: verify code failed", "email", email, "error", err.Error())
+			return nil, nil, err
+		}
 	}
 
 	if _, err := s.validateOAuthRegistrationInvitation(ctx, invitationCode); err != nil {

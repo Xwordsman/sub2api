@@ -1136,6 +1136,71 @@ func TestCreateOIDCOAuthAccountCreatesUserBindsIdentityAndConsumesSession(t *tes
 	require.NotNil(t, storedSession.ConsumedAt)
 }
 
+func TestCreateOIDCOAuthAccountWithExistingTargetUserIDInSessionCanCreateNewUser(t *testing.T) {
+	handler, client := newOAuthPendingFlowTestHandler(t, false)
+	t.Cleanup(func() { _ = client.Close() })
+
+	ctx := context.Background()
+	existingUser, err := client.User.Create().
+		SetEmail("existing@example.com").
+		SetUsername("existing_user").
+		SetPasswordHash("hash").
+		SetRole(service.RoleUser).
+		SetStatus(service.StatusActive).
+		Save(ctx)
+	require.NoError(t, err)
+
+	session, err := client.PendingAuthSession.Create().
+		SetSessionToken("create-account-session-token-with-target").
+		SetIntent("login").
+		SetProviderType("oidc").
+		SetProviderKey("https://issuer.example").
+		SetProviderSubject("oidc-create-target-123").
+		SetBrowserSessionKey("create-account-browser-session-key-with-target").
+		SetTargetUserID(existingUser.ID).
+		SetUpstreamIdentityClaims(map[string]any{
+			"username":               "oidc_target_user",
+			"suggested_display_name": "Decoupled OIDC User",
+			"suggested_avatar_url":   "https://cdn.example/decoupled.png",
+		}).
+		SetRedirectTo("/profile").
+		SetExpiresAt(time.Now().UTC().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	body := bytes.NewBufferString(`{"email":"brandnew@example.com","password":"secret-123","adopt_display_name":false,"adopt_avatar":false}`)
+	recorder := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(recorder)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/oidc/create-account", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: oauthPendingSessionCookieName, Value: encodeCookieValue(session.SessionToken)})
+	req.AddCookie(&http.Cookie{Name: oauthPendingBrowserCookieName, Value: encodeCookieValue("create-account-browser-session-key-with-target")})
+	ginCtx.Request = req
+
+	handler.CreateOIDCOAuthAccount(ginCtx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.NotEmpty(t, payload["access_token"])
+
+	createdUser, err := client.User.Query().Where(dbuser.EmailEQ("brandnew@example.com")).Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, service.StatusActive, createdUser.Status)
+
+	identity, err := client.AuthIdentity.Query().
+		Where(
+			authidentity.ProviderTypeEQ("oidc"),
+			authidentity.ProviderKeyEQ("https://issuer.example"),
+			authidentity.ProviderSubjectEQ("oidc-create-target-123"),
+		).
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, createdUser.ID, identity.UserID)
+	require.NotEqual(t, existingUser.ID, identity.UserID)
+}
+
 func TestCreateOIDCOAuthAccountAppliesPromoCodeFromPendingSession(t *testing.T) {
 	promoRepo := newOAuthPendingFlowPromoRepoStub("WELCOME2024", 25)
 	emailCache := &oauthPendingFlowEmailCacheStub{

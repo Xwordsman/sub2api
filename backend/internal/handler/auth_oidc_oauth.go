@@ -461,15 +461,29 @@ func (h *AuthHandler) OIDCOAuthCallback(c *gin.Context) {
 
 	// 快捷路径：当上游返回已验证邮箱、部署不要求额外确认且本地没有同邮箱账号时，
 	// 直接信任上游身份完成注册/登录，避免展示 choice 页。
-	if compatEmailUser == nil &&
-		strings.TrimSpace(compatEmail) != "" &&
-		emailVerified != nil && *emailVerified {
+	upstreamEmailTrusted := false
+	if cfg.RequireEmailVerified {
+		upstreamEmailTrusted = emailVerified != nil && *emailVerified
+	} else {
+		upstreamEmailTrusted = emailVerified == nil || *emailVerified
+	}
+
+	fastPathEmail := ""
+	if compatEmailUser == nil {
+		if strings.TrimSpace(compatEmail) != "" && upstreamEmailTrusted {
+			fastPathEmail = strings.TrimSpace(compatEmail)
+		} else if !h.isForceEmailOnThirdPartySignup(c.Request.Context()) && strings.TrimSpace(compatEmail) == "" {
+			fastPathEmail = email
+		}
+	}
+
+	if fastPathEmail != "" {
 		if handled := h.tryOIDCVerifiedEmailFastPath(
 			c,
 			frontendCallback,
 			redirectTo,
 			identityRef,
-			compatEmail,
+			fastPathEmail,
 			username,
 			upstreamClaims,
 		); handled {
@@ -1237,7 +1251,8 @@ func (h *AuthHandler) tryOIDCVerifiedEmailFastPath(
 		return false
 	}
 	ctx := c.Request.Context()
-	if h.isForceEmailOnThirdPartySignup(ctx) {
+	syntheticEmail := pendingSessionStringValue(upstreamClaims, "email")
+	if h.isForceEmailOnThirdPartySignup(ctx) && (strings.TrimSpace(compatEmail) == "" || strings.EqualFold(compatEmail, syntheticEmail)) {
 		return false
 	}
 	if h.settingSvc.IsInvitationCodeEnabled(ctx) {

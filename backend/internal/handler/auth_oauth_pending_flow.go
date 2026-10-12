@@ -383,6 +383,16 @@ func ensurePendingOAuthCompleteRegistrationSession(session *dbent.PendingAuthSes
 	return nil
 }
 
+func ensurePendingOAuthCreateAccountSession(session *dbent.PendingAuthSession) error {
+	if session == nil {
+		return infraerrors.BadRequest("PENDING_AUTH_SESSION_INVALID", "pending auth registration context is invalid")
+	}
+	if strings.TrimSpace(session.Intent) != oauthIntentLogin {
+		return infraerrors.BadRequest("PENDING_AUTH_SESSION_INVALID", "pending auth registration context is invalid")
+	}
+	return nil
+}
+
 func buildLegacyCompleteRegistrationPendingResponse(
 	session *dbent.PendingAuthSession,
 	forceEmailOnSignup bool,
@@ -1718,7 +1728,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 		response.ErrorFrom(c, err)
 		return
 	}
-	if err := ensurePendingOAuthCompleteRegistrationSession(session); err != nil {
+	if err := ensurePendingOAuthCreateAccountSession(session); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
